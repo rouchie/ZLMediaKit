@@ -580,6 +580,8 @@ if(ENABLE_SERVER)
   add_subdirectory(server)
 endif()
 
+add_subdirectory(rouchie)
+
 # Android 会 add_subdirectory 并依赖该变量
 # Android will add_subdirectory and depend on this variable
 if(ENABLE_SERVER_LIB AND NOT CMAKE_PARENT_LIST_FILE STREQUAL CMAKE_CURRENT_LIST_FILE)
