@@ -59,8 +59,8 @@ int main(int argc,char *argv[])
 	auto httpSrv = std::make_shared<TcpServer>();
     httpSrv->start<mediakit::HttpSession>(80, "::");
 
-    auto mp4Mod = CreateModule<MP4ReaderMod>("test.mp4");
-    auto rtspMod = CreateModule<RtspPlayerMod>("rtsp://admin:chen5477@192.168.2.111/stream1");
+    //auto mp4Mod = CreateModule<MP4ReaderMod>("test.mp4");
+    auto rtspMod = CreateModule<RtspPlayerMod>("rtsp://admin:chen5477@192.168.2.111/stream2");
 
     static semaphore sem;
     signal(SIGINT, [](int) { sem.post(); }); // 设置退出信号

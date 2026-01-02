@@ -31,7 +31,7 @@ RQTimer::CreateTimer(uint64_t interval, const std::function<bool()> &callback, b
 }
 
 RQTimer::RQTimer(uint64_t interval, const std::function<bool()> &callback, bool immediate, const toolkit::EventPoller::Ptr &poller)
-    : _id(++g_timer_id)
+    : RQTimer()
 {
     _delayTask = CreateTimer(interval, callback, immediate, poller);
 }
@@ -42,6 +42,23 @@ RQTimer::~RQTimer()
     if (ptr) {
         ptr->cancel();
     }
+    TraceL << "RQTimer Delete:" << _id;
+}
+
+RQTimer::RQTimer()
+    : _id(++g_timer_id)
+{
+    TraceL << "RQTimer Create:" << _id;
+}
+
+int RQTimer::Start(uint64_t interval, const std::function<bool()>& callback, bool immediate, const toolkit::EventPoller::Ptr& poller)
+{
+    auto ptr = CreateTimer(interval, callback, immediate, poller);
+    _delayTask = ptr;
+    if (!ptr) {
+        return false;
+    }
+    return true;
 }
 
 int64_t RQTimer::ID() const

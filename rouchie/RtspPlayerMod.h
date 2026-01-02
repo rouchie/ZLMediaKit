@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "Base/RQModuleBase.h"
+#include "Base/RQCore.h"
 #include "Rtsp/RtspPlayer.h"
 #include "Player/PlayerProxy.h"
 
@@ -18,4 +19,6 @@ private:
 private:
     std::string _url;
     PlayerProxy::Ptr _proxy;
+
+    MediaPlayer::Ptr _player;
 };

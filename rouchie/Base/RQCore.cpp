@@ -26,6 +26,29 @@ int RQCore::SendMsg(const RQMsg::Ptr& msg)
     return CODE_SUCCESS;
 }
 
+int64_t RQCore::SendDelayMsg(int64_t delay, const RQMsg::Ptr& msg)
+{
+    RQTimer::Ptr timer = std::make_shared<RQTimer>();
+    int64_t id = timer->ID();
+
+    timer->Start(delay, [id, msg, weak_this = WPtr(shared_from_this())]() {
+        if (auto shared_this = weak_this.lock()) {
+            shared_this->SendMsg(msg);
+            shared_this->DelayMsgCancel(id);
+        }
+        return false;
+    });
+
+    _mapTimers.emplace(id, timer);
+
+    return id;
+}
+
+void RQCore::DelayMsgCancel(int64_t timerID)
+{
+    _mapTimers.erase(timerID);
+}
+
 void RQCore::AddModule(mod_t id, RQModuleBase::Ptr module)
 {
     if (!module)
