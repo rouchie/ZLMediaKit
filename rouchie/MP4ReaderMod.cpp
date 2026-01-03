@@ -1,7 +1,7 @@
 ﻿#include "MP4ReaderMod.h"
 
 MP4ReaderMod::MP4ReaderMod(const std::string& mp4File)
-    : RQModuleBase(MOD_MP4READER),  _mp4File(mp4File)
+    : RQModuleHelper<MP4ReaderMod>(MOD_MP4READER),  _mp4File(mp4File)
 {
 }
 
@@ -35,7 +35,7 @@ int MP4ReaderMod::OnStart()
     // After all tracks are added, prevent the maximum waiting time of 3 seconds in the case of a single track
     _muxer->addTrackCompleted();
 
-    _timerHeartbeat = Timer(10, MSG(ID(), CMD_HEARTBEAT, 0));
+    _timerHeartbeat = Timer(10, RQMsg::Build(ID(), CMD_HEARTBEAT));
 
     return 0;
 }

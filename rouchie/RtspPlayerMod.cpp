@@ -4,7 +4,7 @@
 #include "fmt/format.h"
 
 RtspPlayerMod::RtspPlayerMod(const std::string& url)
-    : RQModuleBase(MOD_RTSPPLAYER),  _url(url)
+    : RQModuleHelper<RtspPlayerMod>(MOD_RTSPPLAYER),  _url(url)
 {
 }
 
@@ -16,7 +16,7 @@ int RtspPlayerMod::OnStart()
         return 0;
         });
 
-    Timer(1000, MSG(ID(), CMD_HEARTBEAT, 0), true);
+    Timer(1000, RQMsg::Build(ID(), CMD_HEARTBEAT, 0), true);
 
     auto weakSelf = std::weak_ptr<RQModuleBase>(shared_from_this());
 
@@ -34,7 +34,7 @@ int RtspPlayerMod::OnStart()
             auto tracks = _player->getTracks();
             for (auto &track : tracks) {
                 InfoL << fmt::format("Track codec: {}", track->getCodecName());
-                //track->addDelegate();
+                track->addDelegate(shared_from_this());
             }
         }
     });
@@ -84,6 +84,13 @@ int RtspPlayerMod::OnStart()
     _proxy->play(_url);
 
     return 0;
+}
+
+bool RtspPlayerMod::inputFrame(const Frame::Ptr& frame)
+{
+    auto frameinfo = [frame]() { return fmt::format("dts({}) pts({}) keyFrame({}) codec({})", frame->dts(), frame->pts(), frame->keyFrame(), frame->getCodecName()); }();
+    InfoL << frameinfo;
+    return true;
 }
 
 int RtspPlayerMod::OnHeartbeat(const RQMsg::Ptr& msg)

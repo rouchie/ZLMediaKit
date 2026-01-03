@@ -8,10 +8,13 @@
 using namespace toolkit;
 using namespace mediakit;
 
-class RtspPlayerMod : public RQModuleBase {
+class RtspPlayerMod : public RQModuleHelper<RtspPlayerMod>, public FrameWriterInterface {
 public:
     RtspPlayerMod(const std::string& url);
     int OnStart() override;
+
+public:
+    bool inputFrame(const Frame::Ptr &frame) override;
 
 private:
     int OnHeartbeat(const RQMsg::Ptr &msg);

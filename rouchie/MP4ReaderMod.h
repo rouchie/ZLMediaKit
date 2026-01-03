@@ -7,7 +7,7 @@
 using namespace toolkit;
 using namespace mediakit;
 
-class MP4ReaderMod : public RQModuleBase {
+class MP4ReaderMod : public RQModuleHelper<MP4ReaderMod> {
 public:
     MP4ReaderMod(const std::string& mp4File);
     int OnStart() override;

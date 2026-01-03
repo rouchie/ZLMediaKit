@@ -17,16 +17,17 @@ public:
     RQMsg::Ptr Set(const std::string& value);
 
 public:
-    mod_t       _sender = 0;
-    mod_t       _recver = 0;
-    cmd_t       _cmd = 0;
+    mod_t _sender = 0;
+    mod_t _recver = 0;
+    cmd_t _cmd = 0;
 
-    int64_t     _param0 = 0;
-    double      _param1 = 0.;
+    int64_t _param0 = 0;
+    double _param1 = 0.;
     std::string _param2;
 
 public:
     static RQMsg::Ptr Build(mod_t recver, cmd_t cmd);
+    static RQMsg::Ptr Build(mod_t recver, cmd_t cmd, int value);
     static RQMsg::Ptr Build(mod_t recver, cmd_t cmd, int64_t value);
     static RQMsg::Ptr Build(mod_t recver, cmd_t cmd, double value);
     static RQMsg::Ptr Build(mod_t recver, cmd_t cmd, const std::string& value);

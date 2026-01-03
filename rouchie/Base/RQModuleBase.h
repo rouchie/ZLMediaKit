@@ -8,7 +8,7 @@
 
 using namespace toolkit;
 
-class RQModuleBase : public std::enable_shared_from_this<RQModuleBase> {
+class RQModuleBase {
 public:
     using WPtr = std::weak_ptr<RQModuleBase>;
     using Ptr = std::shared_ptr<RQModuleBase>;
@@ -24,38 +24,64 @@ public:
     // 获取模块所属的事件轮询器
     const EventPoller::Ptr& GetPoller() const;
 
-    int64_t Timer(uint64_t interval, const RQMsg::Ptr &msg, bool immediate = false);
-    void TimerCancel(int64_t timerID);
-
 public:
     // 模块注册完成后会回调该接口
     virtual int OnStart();
     virtual int OnModuleCallback(const RQMsg::Ptr &msg);
 
 protected:
+    void Bind(cmd_t cmd, HandleFunc func);
+
+protected:
     virtual int OnUnBindMsg(const RQMsg::Ptr &msg);
     virtual int OnEmptyMsg();
 
 protected:
-    void Bind(cmd_t cmd, HandleFunc func);
-
-    template<typename Derived>
-    void Bind(cmd_t cmd, int (Derived::*method)(const RQMsg::Ptr &));
-
-protected:
-    template <typename... Args>
-    RQMsg::Ptr MSG(Args &&...args);
 
 private:
     std::unordered_map<cmd_t, HandleFunc> _mapMsgId2Func;
-    std::unordered_map<int64_t, RQTimer::Ptr> _mapTimers;
 
     mod_t _modID = 0;
     EventPoller::Ptr _poller;
 };
 
+template <typename Derived>
+class RQModuleHelper
+    : public std::enable_shared_from_this<Derived>
+    , public RQModuleBase
+{
+protected:
+    RQModuleHelper(mod_t id, const EventPoller::Ptr &poller = nullptr)
+        : RQModuleBase(id, poller) {}
+
+protected:
+    int64_t Timer(uint64_t interval, const RQMsg::Ptr &msg, bool immediate = false);
+    void TimerCancel(int64_t timerID) { _mapTimers.erase(timerID); }
+
+    void Bind(cmd_t cmd, int (Derived::*method)(const RQMsg::Ptr &));
+    void Bind(cmd_t cmd, HandleFunc func) { RQModuleBase::Bind(cmd, func); }
+
+private:
+    std::unordered_map<int64_t, RQTimer::Ptr> _mapTimers;
+};
+
+template <typename Derived>
+int64_t RQModuleHelper<Derived>::Timer(uint64_t interval, const RQMsg::Ptr &msg, bool immediate)
+{
+    RQTimer::Ptr timer = std::make_shared<RQTimer>(interval, [msg, weak_this = WPtr(shared_from_this())]() {
+		if (auto shared_this = weak_this.lock()) {
+			shared_this->OnModuleCallback(msg);
+			return true;
+		}
+		return false; // 对象已销毁，停止定时器
+	}, immediate, GetPoller());
+
+    _mapTimers.emplace(timer->ID(), timer);
+    return timer->ID();
+}
+
 template<typename Derived>
-void RQModuleBase::Bind(cmd_t cmd, int(Derived::*method)(const RQMsg::Ptr&)) {
+void RQModuleHelper<Derived>::Bind(cmd_t cmd, int(Derived::*method)(const RQMsg::Ptr&)) {
 	WPtr weak_this = shared_from_this();
 
 	auto f = [weak_this, method](const RQMsg::Ptr &msg) -> int {
@@ -70,8 +96,3 @@ void RQModuleBase::Bind(cmd_t cmd, int(Derived::*method)(const RQMsg::Ptr&)) {
     Bind(cmd, f);
 }
 
-template <typename... Args>
-RQMsg::Ptr RQModuleBase::MSG(Args &&...args)
-{
-    return RQMsg::Build(ID(), std::forward<Args>(args)...);
-}

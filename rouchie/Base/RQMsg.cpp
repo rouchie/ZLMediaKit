@@ -61,6 +61,11 @@ RQMsg::Ptr RQMsg::Build(mod_t recver, cmd_t cmd)
     return std::move(msg);
 }
 
+RQMsg::Ptr RQMsg::Build(mod_t recver, cmd_t cmd, int value)
+{
+    return Build(recver, cmd, (int64_t)value);
+}
+
 RQMsg::Ptr RQMsg::Build(mod_t recver, cmd_t cmd, int64_t value)
 {
     RQMsg::Ptr msg = std::make_shared<RQMsg>(MOD_NONAME, recver, cmd);
