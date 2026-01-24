@@ -20,6 +20,16 @@ const EventPoller::Ptr& RQModuleBase::GetPoller() const
     return _poller;
 }
 
+void RQModuleBase::UpdateSelf(Ptr self)
+{
+    this->_self = self;
+}
+
+void RQModuleBase::DeleteSelf()
+{
+    this->_self.reset();
+}
+
 void RQModuleBase::Bind(cmd_t id, HandleFunc func)
 {
     _mapMsgId2Func[id] = func;

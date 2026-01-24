@@ -31,7 +31,15 @@ int64_t RQCore::SendDelayMsg(int64_t delay, const RQMsg::Ptr& msg)
     RQTimer::Ptr timer = std::make_shared<RQTimer>();
     int64_t id = timer->ID();
 
-    timer->Start(delay, [id, msg, weak_this = WPtr(shared_from_this())]() {
+    {
+        // 出现过一次死锁，因为模块的onstart函数会加锁调用，所以在onstart再次调用这个函数会死锁
+        std::lock_guard<std::recursive_mutex> lock(_mutex);
+        _mapTimers.emplace(id, timer);
+    }
+
+    auto weak_this = WPtr(shared_from_this());
+
+    timer->Start(delay, [id, msg, weak_this]() {
         if (auto shared_this = weak_this.lock()) {
             shared_this->SendMsg(msg);
             shared_this->DelayMsgCancel(id);
@@ -39,13 +47,12 @@ int64_t RQCore::SendDelayMsg(int64_t delay, const RQMsg::Ptr& msg)
         return false;
     });
 
-    _mapTimers.emplace(id, timer);
-
     return id;
 }
 
 void RQCore::DelayMsgCancel(int64_t timerID)
 {
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     _mapTimers.erase(timerID);
 }
 
@@ -54,7 +61,7 @@ void RQCore::AddModule(mod_t id, RQModuleBase::Ptr module)
     if (!module)
         return;
 
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
 
     auto range = _mapModules.equal_range(id);
     for (auto it = range.first; it != range.second; ++it) {
@@ -77,7 +84,7 @@ void RQCore::AddModule(mod_t id, RQModuleBase::Ptr module)
 
 void RQCore::DelModule(mod_t id)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     _mapModules.erase(id);
 }
 
@@ -87,7 +94,7 @@ void RQCore::DelModule(RQModuleBase::Ptr module)
         return;
     }
 
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
     mod_t id = module->ID();
 
     auto range = _mapModules.equal_range(id);

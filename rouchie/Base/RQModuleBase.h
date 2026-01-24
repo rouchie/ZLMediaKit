@@ -24,6 +24,9 @@ public:
     // 获取模块所属的事件轮询器
     const EventPoller::Ptr& GetPoller() const;
 
+    void UpdateSelf(Ptr self);
+    void DeleteSelf();
+
 public:
     // 模块注册完成后会回调该接口
     virtual int OnStart();
@@ -36,13 +39,13 @@ protected:
     virtual int OnUnBindMsg(const RQMsg::Ptr &msg);
     virtual int OnEmptyMsg();
 
-protected:
-
 private:
     std::unordered_map<cmd_t, HandleFunc> _mapMsgId2Func;
 
     mod_t _modID = 0;
     EventPoller::Ptr _poller;
+
+    Ptr _self;
 };
 
 template <typename Derived>
@@ -63,12 +66,15 @@ protected:
 
 private:
     std::unordered_map<int64_t, RQTimer::Ptr> _mapTimers;
+    RQModuleBase::Ptr _self;
 };
 
 template <typename Derived>
 int64_t RQModuleHelper<Derived>::Timer(uint64_t interval, const RQMsg::Ptr &msg, bool immediate)
 {
-    RQTimer::Ptr timer = std::make_shared<RQTimer>(interval, [msg, weak_this = WPtr(shared_from_this())]() {
+    auto weak_this = WPtr(std::enable_shared_from_this<Derived>::shared_from_this());
+
+    RQTimer::Ptr timer = std::make_shared<RQTimer>(interval, [msg, weak_this]() {
 		if (auto shared_this = weak_this.lock()) {
 			shared_this->OnModuleCallback(msg);
 			return true;
@@ -82,7 +88,7 @@ int64_t RQModuleHelper<Derived>::Timer(uint64_t interval, const RQMsg::Ptr &msg,
 
 template<typename Derived>
 void RQModuleHelper<Derived>::Bind(cmd_t cmd, int(Derived::*method)(const RQMsg::Ptr&)) {
-	WPtr weak_this = shared_from_this();
+	WPtr weak_this = std::enable_shared_from_this<Derived>::shared_from_this();
 
 	auto f = [weak_this, method](const RQMsg::Ptr &msg) -> int {
 		if (auto shared_this = weak_this.lock()) {

@@ -7,7 +7,7 @@ bool FrameWriterImp::inputFrame(const Frame::Ptr& frame)
 }
 
 RtpDecodeMod::RtpDecodeMod()
-    : RQModuleBase(MOD_RTPDECODE)
+    : RQModuleBase(0)
 {
     _demuxer = std::make_shared<RtspDemuxer>();
     _demuxer->setTrackListener(this);

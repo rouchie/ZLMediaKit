@@ -52,13 +52,12 @@ RQMsg::Ptr RQMsg::Build(mod_t sender, mod_t recver, cmd_t cmd, const std::string
 {
     RQMsg::Ptr msg = std::make_shared<RQMsg>(sender, recver, cmd);
     msg->_param2 = value;
-    return std::move(msg);
+    return msg;
 }
 
 RQMsg::Ptr RQMsg::Build(mod_t recver, cmd_t cmd)
 {
-    RQMsg::Ptr msg = std::make_shared<RQMsg>(MOD_NONAME, recver, cmd);
-    return std::move(msg);
+    return std::make_shared<RQMsg>(MOD_NONAME, recver, cmd);
 }
 
 RQMsg::Ptr RQMsg::Build(mod_t recver, cmd_t cmd, int value)

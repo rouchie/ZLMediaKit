@@ -14,6 +14,7 @@ typedef enum code_id : code_t {
 #define X(name, value) name = value,
     CODE_LIST
 #undef X
+    CODE_MAX
 } CODE_ID;
 
 inline const std::string& GetCodeID(code_t id)

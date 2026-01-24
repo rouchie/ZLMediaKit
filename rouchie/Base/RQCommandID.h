@@ -15,7 +15,7 @@ typedef enum cmd_id : cmd_t {
 #define X(name, value) name = value,
     CMD_LIST
 #undef X
-    CMD_MAX
+    CMD_END
 } COMMAND_ID;
 
 inline const std::string& GetCommandID(cmd_t id)

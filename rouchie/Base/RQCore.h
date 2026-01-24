@@ -27,25 +27,11 @@ public:
     void DelModule(RQModuleBase::Ptr module);
 
 private:
-    std::mutex _mutex;
+    std::recursive_mutex _mutex;
     std::unordered_multimap<mod_t, RQModuleBase::WPtr> _mapModules;
 
     std::unordered_map<int64_t, RQTimer::Ptr> _mapTimers;
 };
-
-template <typename ModuleType, typename... Args>
-RQModuleBase::Ptr CreateModule(Args&&... args)
-{
-    // 创建模块实例，完美转发参数
-    auto ptr = std::make_shared<ModuleType>(std::forward<Args>(args)...);
-    
-    // 注册到核心管理器
-    if (RQCore::INST()) {
-        RQCore::INST()->AddModule(ptr->ID(), ptr);
-    }
-    
-    return ptr;
-}
 
 inline int SendMsg(const RQMsg::Ptr& msg)
 {

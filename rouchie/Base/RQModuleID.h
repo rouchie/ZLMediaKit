@@ -1,21 +1,23 @@
 ﻿#pragma once
 
 #include <iostream>
+#include <mutex>
 #include <unordered_map>
 
 using mod_t  = int64_t;
 
 #define MODULE_LIST                \
-    X(MOD_INVALID,    -1)           \
-    X(MOD_NONAME,     0)            \
+    X(MOD_INVALID,    -1)          \
+    X(MOD_NONAME,     0)           \
     X(MOD_RTSPPLAYER, 100)         \
-    X(MOD_MP4READER,  101)          \
+    X(MOD_MP4READER,  101)         \
     X(MOD_HELLO,      1000)
 
 typedef enum module_id : mod_t{
 #define X(name, value) name = value,
     MODULE_LIST
 #undef X
+    MOD_END
 } MODULE_ID;
 
 inline const std::string& GetModuleID(mod_t id)
@@ -27,4 +29,12 @@ inline const std::string& GetModuleID(mod_t id)
 	};
 
     return g_module_id_strings[id];
+}
+
+inline mod_t ModID()
+{
+    static mod_t id = MOD_END + 1000; // 预留一部分
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
+    return ++id;
 }
