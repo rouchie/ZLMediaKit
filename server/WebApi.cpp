@@ -86,6 +86,7 @@ const string kSecret = API_FIELD"secret";
 const string kSnapRoot = API_FIELD"snapRoot";
 const string kDefaultSnap = API_FIELD"defaultSnap";
 const string kDownloadRoot = API_FIELD"downloadRoot";
+const string kLegacyAuth = API_FIELD"legacyAuth";
 
 static onceToken token([]() {
     mINI::Instance()[kApiDebug] = "1";
@@ -93,6 +94,7 @@ static onceToken token([]() {
     mINI::Instance()[kSnapRoot] = "./www/snap/";
     mINI::Instance()[kDefaultSnap] = "./www/logo.png";
     mINI::Instance()[kDownloadRoot] = "./www";
+    mINI::Instance()[kLegacyAuth] = 1;
 });
 }//namespace API
 
@@ -101,21 +103,21 @@ using HttpApi = function<void(const Parser &parser, const HttpSession::HttpRespo
 // http api list
 static map<string, HttpApi, StrCaseCompare> s_map_api;
 
-static void responseApi(const Json::Value &res, const HttpSession::HttpResponseInvoker &invoker){
-    GET_CONFIG(string, charSet, Http::kCharSet);
-    HttpSession::KeyValue headerOut;
-    headerOut["Content-Type"] = string("application/json; charset=") + charSet;
-    invoker(200, headerOut, res.toStyledString());
-};
-
-static void responseApi(int code, const string &msg, const HttpSession::HttpResponseInvoker &invoker){
+static void responseApi(int code, const string &msg, const HttpSession::HttpResponseInvoker &invoker, ApiRetException *ex = nullptr){
     Json::Value res;
+    HttpSession::KeyValue headerOut;
+    if (ex) {
+        res = ex->getBody();
+        headerOut = ex->getHeaders();
+    }
     res["code"] = code;
     res["msg"] = msg;
-    responseApi(res, invoker);
-}
 
-static ApiArgsType getAllArgs(const Parser &parser);
+    GET_CONFIG(string, charSet, Http::kCharSet);
+    headerOut["Content-Type"] = string("application/json; charset=") + charSet;
+
+    invoker(200, headerOut, res.toStyledString());
+}
 
 static HttpApi toApi(const function<void(API_ARGS_MAP_ASYNC)> &cb) {
     return [cb](const Parser &parser, const HttpSession::HttpResponseInvoker &invoker, SockInfo &sender) {
@@ -215,7 +217,7 @@ void api_regist(const string &api_path, const function<void(API_ARGS_STRING_ASYN
 
 // 获取HTTP请求中url参数、content参数  [AUTO-TRANSLATED:d161a1e1]
 // Get URL parameters and content parameters from the HTTP request
-static ApiArgsType getAllArgs(const Parser &parser) {
+ApiArgsType getAllArgs(const Parser &parser) {
     ApiArgsType allArgs;
     if (parser["Content-Type"].find("application/x-www-form-urlencoded") == 0) {
         auto contentArgs = parser.parseArgs(parser.content());
@@ -306,12 +308,12 @@ static inline void addHttpListener(){
             try {
                 it->second(parser, invoker, *helper);
             } catch (ApiRetException &ex) {
-                responseApi(ex.code(), ex.what(), invoker);
+                responseApi(ex.code(), ex.what(), invoker, &ex);
                 helper->getPoller()->async([helper, ex]() { helper->shutdown(SockException(Err_shutdown, ex.what())); }, false);
             }
 #ifdef ENABLE_MYSQL
             catch (SqlException &ex) {
-                responseApi(API::SqlFailed, StrPrinter << "操作数据库失败:" << ex.what() << ":" << ex.getSql(), invoker);
+                responseApi(API::SqlFailed, StrPrinter << "操作数据库失败:" << ex.what() << ":" << ex.getSql(), invoker, &ex);
             }
 #endif // ENABLE_MYSQL
             catch (std::exception &ex) {
@@ -345,7 +347,7 @@ static inline string getPusherKey(const string &schema, const string &vhost, con
     return schema + "/" + vhost + "/" + app + "/" + stream + "/" + MD5(dst_url).hexdigest();
 }
 
-static void fillSockInfo(Value& val, SockInfo* info) {
+void fillSockInfo(Value& val, SockInfo* info) {
     val["peer_ip"] = info->get_peer_ip();
     val["peer_port"] = info->get_peer_port();
     val["local_port"] = info->get_local_port();
@@ -365,7 +367,7 @@ Value ToJson(const PusherProxy::Ptr& p) {
     item["url"] = p->getUrl();
     item["status"] = p->getStatus();
     item["liveSecs"] = p->getLiveSecs();
-    item["rePublishCount"] = p->getRePublishCount();    
+    item["rePublishCount"] = p->getRePublishCount();
     item["bytesSpeed"] = (Json::UInt64) p->getSendSpeed();
     item["totalBytes"] =(Json::UInt64) p->getSendTotalBytes();
 
@@ -710,6 +712,44 @@ void getThreadsLoad(TaskExecutorGetterImp &getter, API_ARGS_MAP_ASYNC) {
     });
 }
 
+static constexpr char kLoginCookiePath[] = "/";
+static constexpr char kUnLoginCookieName[] = "ZLM_UNLOGIN";
+static constexpr char kLoginedCookieName[] = "ZLM_LOGINED";
+static constexpr size_t kUnLoginCookieLifeSeconds = 60;
+static constexpr size_t kLoginedCookieLifeSeconds = 24 * 3600;
+
+template <typename T>
+void check_secret(toolkit::SockInfo &sender, mediakit::HttpSession::KeyValue &headerOut, const HttpAllArgs<T> &allArgs, Json::Value &val) {
+    GET_CONFIG(bool, legacy_auth , API::kLegacyAuth);
+    GET_CONFIG(std::string, api_secret, API::kSecret);
+
+    auto ip = sender.get_peer_ip();
+    if (!HttpFileManager::isIPAllowed(ip)) {
+        throw AuthException("Your ip is not allowed to access the service.");
+    }
+    if (legacy_auth) {
+        CHECK_ARGS("secret");
+        if (api_secret != allArgs["secret"]) {
+            throw AuthException("Incorrect secret");
+        }
+    } else {
+        auto logined_cookie = HttpCookieManager::Instance().getCookie(kLoginedCookieName, allArgs.getParser().getHeader());
+        if (!logined_cookie) {
+            auto unlogin_cookie = HttpCookieManager::Instance().getCookie(kUnLoginCookieName, allArgs.getParser().getHeader());
+            if (!unlogin_cookie) {
+                unlogin_cookie = HttpCookieManager::Instance().addCookie(kUnLoginCookieName, "", kUnLoginCookieLifeSeconds);
+                headerOut["Set-Cookie"] = unlogin_cookie->getCookie(kLoginCookiePath);
+            }
+            val["cookie"] = unlogin_cookie->getCookie();
+            throw AuthException("Please login first", headerOut, val);
+        }
+    }
+}
+
+template void check_secret<ApiArgsType>(toolkit::SockInfo &, mediakit::HttpSession::KeyValue &, const HttpAllArgs<ApiArgsType> &, Json::Value &);
+template void check_secret<Json::Value>(toolkit::SockInfo &, mediakit::HttpSession::KeyValue &, const HttpAllArgs<Json::Value> &, Json::Value &);
+template void check_secret<std::string>(toolkit::SockInfo &, mediakit::HttpSession::KeyValue &, const HttpAllArgs<std::string> &, Json::Value &);
+
 /**
  * 安装api接口
  * 所有api都支持GET和POST两种方式
@@ -722,7 +762,6 @@ void getThreadsLoad(TaskExecutorGetterImp &getter, API_ARGS_MAP_ASYNC) {
  */
 void installWebApi() {
     addHttpListener();
-    GET_CONFIG(string,api_secret,API::kSecret);
 
     // 获取线程负载  [AUTO-TRANSLATED:3b0ece5c]
     // Get thread load
@@ -1079,6 +1118,7 @@ void installWebApi() {
             }
             fillSockInfo(jsession, session.get());
             jsession["id"] = id;
+            jsession["type"] = session->getSock()->sockType() == SockNum::Sock_TCP ? "tcp" : "udp";
             jsession["typeid"] = toolkit::demangle(typeid(*session).name());
             val["data"].append(jsession);
         });
@@ -2345,23 +2385,22 @@ void installWebApi() {
        CHECK_SECRET();
        CHECK_ARGS("timeout_ms");
 
-       auto result = std::make_shared<Value>(std::move(val));
-       auto complete_token = std::make_shared<onceToken>(nullptr, [result, headerOut, invoker]() {
-           invoker(200, headerOut, result->toStyledString());
-       });
-       auto lam_search = [complete_token, result](const std::map<string, string> &device_info,
-                                                  const std::string &onvif_url) {
-           Value obj;
-           obj["onvif_url"] = onvif_url;
-           for (auto &pr : device_info) {
-               obj[pr.first] = pr.second;
-           }
-           (*result)["data"].append(std::move(obj));
-           //继续等待扫描
-           return true;
-       };
-       OnvifSearcher::Instance().sendSearchBroadcast(std::move(lam_search), allArgs["timeout_ms"]);
-   });
+        string subnet_prefix = allArgs["subnet_prefix"];
+
+        auto result = std::make_shared<Value>(std::move(val));
+        auto complete_token = std::make_shared<onceToken>(nullptr, [result, headerOut, invoker]() { invoker(200, headerOut, result->toStyledString()); });
+        auto lam_search = [complete_token, result](const std::map<string, string> &device_info, const std::string &onvif_url) {
+            Value obj;
+            obj["onvif_url"] = onvif_url;
+            for (auto &pr : device_info) {
+                obj[pr.first] = pr.second;
+            }
+            (*result)["data"].append(std::move(obj));
+            //继续等待扫描
+            return true;
+        };
+        OnvifSearcher::Instance().sendSearchBroadcast(std::move(subnet_prefix), std::move(lam_search), allArgs["timeout_ms"]);
+    });
 
     api_regist("/index/api/getStreamUrl", [](API_ARGS_MAP_ASYNC) {
         CHECK_SECRET();
@@ -2385,6 +2424,61 @@ void installWebApi() {
             }
             invoker(200, headerOut, val.toStyledString());
         });
+    });
+
+    api_regist("/index/api/login", [](API_ARGS_MAP) {
+        auto logined_cookie = HttpCookieManager::Instance().getCookie(kLoginedCookieName, allArgs.getParser().getHeader());
+
+        CHECK_ARGS("digest");
+        GET_CONFIG(std::string, api_secret, API::kSecret);
+
+        auto unlogin_cookie = HttpCookieManager::Instance().getCookie(kUnLoginCookieName, allArgs.getParser().getHeader());
+        // MD5("zlmediakit:"+${secret}+":" +${cookie})
+        auto digest_ok = unlogin_cookie ? MD5("zlmediakit:" + api_secret + ":" + unlogin_cookie->getCookie()).hexdigest() : "";
+        if (!unlogin_cookie || digest_ok != allArgs["digest"]) {
+            if (!unlogin_cookie) {
+                unlogin_cookie = HttpCookieManager::Instance().addCookie(kUnLoginCookieName, "", kUnLoginCookieLifeSeconds);
+                headerOut["Set-Cookie"] = unlogin_cookie->getCookie(kLoginCookiePath);
+            }
+            val["cookie"] = unlogin_cookie->getCookie();
+            if (logined_cookie) {
+                // secret校验失败，注销登录
+                logined_cookie->setExpired();
+                HttpCookieManager::Instance().delCookie(logined_cookie);
+                headerOut.emplace_force("Set-Cookie", logined_cookie->getCookie(kLoginCookiePath));
+            }
+            throw AuthException("Digest does not match, incorrect secret?", headerOut, val);
+        }
+        if (!logined_cookie) {
+            // 未登陆状态，设置登录成功, cookie保持24小时
+            logined_cookie = HttpCookieManager::Instance().addCookie(kLoginedCookieName, "", kLoginedCookieLifeSeconds);
+            headerOut["Set-Cookie"] = logined_cookie->getCookie(kLoginCookiePath);
+        }
+
+        // 删除未登录状态的cookie
+        unlogin_cookie->setExpired();
+        HttpCookieManager::Instance().delCookie(unlogin_cookie);
+        headerOut.emplace_force("Set-Cookie", unlogin_cookie->getCookie(kLoginCookiePath));
+
+        val["code"] = API::Success;
+    });
+
+    api_regist("/index/api/logout", [](API_ARGS_MAP) {
+        auto logined_cookie = HttpCookieManager::Instance().getCookie(kLoginedCookieName, allArgs.getParser().getHeader());
+        if (logined_cookie) {
+            // 已经登录成功, 删除cookie
+            logined_cookie->setExpired();
+            HttpCookieManager::Instance().delCookie(logined_cookie);
+            headerOut["Set-Cookie"] = logined_cookie->getCookie(kLoginCookiePath);
+        } else {
+            val["msg"] = "You are not logined";
+        }
+        auto unlogin_cookie = HttpCookieManager::Instance().getCookie(kUnLoginCookieName, allArgs.getParser().getHeader());
+        if (!unlogin_cookie) {
+            unlogin_cookie = HttpCookieManager::Instance().addCookie(kUnLoginCookieName, "", kUnLoginCookieLifeSeconds);
+            headerOut["Set-Cookie"] = unlogin_cookie->getCookie(kLoginCookiePath);
+        }
+        val["cookie"] = unlogin_cookie->getCookie();
     });
 
 #if defined(ENABLE_VIDEOSTACK) && defined(ENABLE_X264) && defined(ENABLE_FFMPEG)
