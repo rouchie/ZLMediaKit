@@ -9,7 +9,7 @@ using namespace mediakit;
 
 class MP4ReaderMod : public RQModuleHelper<MP4ReaderMod> {
 public:
-    MP4ReaderMod(const std::string& mp4File);
+    MP4ReaderMod(const std::string& mp4File, const std::string& app, const std::string& stream);
     int OnStart() override;
 
 private:
@@ -21,6 +21,9 @@ private:
 
 private:
     std::string _mp4File;
+    std::string _app;
+    std::string _stream;
+
     MP4Demuxer::Ptr _demuxer;
     MultiMediaSourceMuxer::Ptr _muxer;
 

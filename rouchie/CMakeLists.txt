@@ -9,9 +9,11 @@ set(Rouchie_SRC_LIST
 	Module/MP4ReaderMod.h
 	Module/RtspPlayerMod.cpp
 	Module/RtspPlayerMod.h
-
 	Module/HttpMod.cpp
 	Module/HttpMod.h
+
+	server/RQRtspSession.cpp
+	server/RQRtspSession.h
 
 	Base/RQCodeID.h
 	Base/RQCommandID.h
