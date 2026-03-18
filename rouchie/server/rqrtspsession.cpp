@@ -75,7 +75,7 @@ void RQRtspSession::onWholeRtspPacket(mediakit::Parser &parser)
 
 void RQRtspSession::onRtpPacket(const char *data,size_t len)
 {
-
+    InfoL << fmt::format("recv rtp[{}] packet size: {}", data[1], len);
 }
 
 void RQRtspSession::handleReq_Options(const mediakit::Parser &parser)
@@ -421,6 +421,11 @@ void RQRtspSession::onAuthSuccess() {
             return;
         }
 
+        strong_self->_rtcp_context.clear();
+        for (auto &track : strong_self->_sdp_track) {
+            strong_self->_rtcp_context.emplace_back(std::make_shared<RtcpContextForSend>());
+        }
+
         strong_self->_sessionid = toolkit::makeRandStr(12);
         for(auto &track : strong_self->_sdp_track){
             auto ssrc = rtsp_src->getSsrc(track->_type);
@@ -474,17 +479,68 @@ int RQRtspSession::getTrackIndexByControlUrl(const std::string &control_url)
     throw toolkit::SockException(toolkit::Err_shutdown, StrPrinter << "no such track with control url:" << control_url);
 }
 
+int RQRtspSession::getTrackIndexByTrackType(mediakit::TrackType type) {
+    for (size_t i = 0; i < _sdp_track.size(); ++i) {
+        if (type == _sdp_track[i]->_type) {
+            return i;
+        }
+    }
+    if (_sdp_track.size() == 1) {
+        return 0;
+    }
+    throw toolkit::SockException(toolkit::Err_shutdown, StrPrinter << "no such track with type:" << getTrackString(type));
+}
+
 void RQRtspSession::sendRtpPacket(const mediakit::RtspMediaSource::RingDataType &pkt)
 {
     switch (_rtp_type) {
         case Rtsp::RTP_TCP: {
             setSendFlushFlag(false);
-            pkt->for_each([&](const RtpPacket::Ptr &rtp) { send(rtp); });
+            pkt->for_each([&](const RtpPacket::Ptr &rtp) {
+                updateRtcpContext(rtp);
+                send(rtp);
+            });
             flushAll();
             setSendFlushFlag(true);
         } break;
         default: break;
     }
+}
+
+void RQRtspSession::updateRtcpContext(const mediakit::RtpPacket::Ptr &rtp)
+{
+    int track_index = getTrackIndexByTrackType(rtp->type);
+    auto &rtcp_ctx = _rtcp_context[track_index];
+
+    rtcp_ctx->onRtp(rtp->getSeq(), rtp->getStamp(), rtp->ntp_stamp, rtp->sample_rate, rtp->size() - RtpPacket::kRtpTcpHeaderSize);
+    if (!rtp->ntp_stamp && !rtp->getStamp()) {
+        // 忽略时间戳都为0的rtp
+        return;
+    }
+
+    auto &ticker = _rtcp_send_tickers[track_index];
+    if (ticker.elapsedTime() > 5 * 1000 || _send_sr_rtcp[track_index]) {
+        //确保在发送rtp前，先发送一次sender report rtcp(用于播放器同步音视频)
+        ticker.resetTime();
+        _send_sr_rtcp[track_index] = false;
+
+        static auto send_rtcp = [](RQRtspSession *thiz, int index, toolkit::Buffer::Ptr ptr) {
+            if (thiz->_rtp_type == Rtsp::RTP_TCP) {
+                auto &track = thiz->_sdp_track[index];
+                thiz->send(makeRtpOverTcpPrefix((uint16_t)(ptr->size()), track->_interleaved + 1));
+                thiz->send(std::move(ptr));
+            }
+        };
+
+        auto ssrc = rtp->getSSRC();
+        auto rtcp = rtcp_ctx->createRtcpSR(ssrc);
+        auto rtcp_sdes = RtcpSdes::create({kServerName});
+        rtcp_sdes->chunks.type = (uint8_t)SdesType::RTCP_SDES_CNAME;
+        rtcp_sdes->chunks.ssrc = htonl(ssrc);
+        send_rtcp(this, track_index, std::move(rtcp));
+        send_rtcp(this, track_index, RtcpHeader::toBuffer(rtcp_sdes));
+    }
+
 }
 
 bool RQRtspSession::sendRtspResponse(const std::string &res_code, const std::initializer_list<std::string> &header, const std::string &sdp, const char *protocol)

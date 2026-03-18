@@ -14,6 +14,10 @@ set(Rouchie_SRC_LIST
 
 	server/RQRtspSession.cpp
 	server/RQRtspSession.h
+	server/RQRtmpSession.cpp
+	server/RQRtmpSession.h
+	server/RQRtmpProtocol.cpp
+	server/RQRtmpProtocol.h
 
 	Base/RQCodeID.h
 	Base/RQCommandID.h

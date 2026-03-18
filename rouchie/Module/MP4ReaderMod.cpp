@@ -58,7 +58,7 @@ int MP4ReaderMod::OnHeartbeat(const RQMsg::Ptr& msg)
 
         auto frame = _demuxer->readFrame(keyFrame, eof);
         if (!frame || eof) {
-            InfoL << "MP4ReaderMod reached end of file.";
+            // InfoL << "MP4ReaderMod reached end of file.";
             setCurrentStamp(0);
             continue;
         }

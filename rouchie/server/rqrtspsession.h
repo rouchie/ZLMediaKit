@@ -36,6 +36,8 @@ private:
 
 private:
     void sendRtpPacket(const mediakit::RtspMediaSource::RingDataType &pkt);
+    void updateRtcpContext(const mediakit::RtpPacket::Ptr &rtp);
+
     bool sendRtspResponse(const std::string &res_code, const std::initializer_list<std::string> &header, const std::string &sdp = "", const char *protocol = "RTSP/1.0");
     bool sendRtspResponse(const std::string &res_code, const mediakit::StrCaseMap &header = mediakit::StrCaseMap(), const std::string &sdp = "", const char *protocol = "RTSP/1.0");
     void send_StreamNotFound();
@@ -47,6 +49,7 @@ private:
     void onAuthSuccess();
 
     int getTrackIndexByControlUrl(const std::string &control_url);
+    int getTrackIndexByTrackType(mediakit::TrackType type);
 
 private:
     uint64_t _bytes_usage = 0;
@@ -65,4 +68,8 @@ private:
 
     std::vector<mediakit::SdpTrack::Ptr> _sdp_track;
     std::weak_ptr<mediakit::RtspMediaSource> _play_src;
+
+    bool _send_sr_rtcp[2] = {true, true};
+    toolkit::Ticker _rtcp_send_tickers[2];
+    std::vector<mediakit::RtcpContext::Ptr> _rtcp_context;
 };
