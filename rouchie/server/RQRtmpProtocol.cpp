@@ -43,6 +43,19 @@ void RQRtmpProtocol::sendAcknowledgement(uint32_t size)
     sendRequest(MSG_ACK, acknowledgement);
 }
 
+void RQRtmpProtocol::sendAcknowledgementSize(uint32_t size) {
+    size = htonl(size);
+    std::string set_windowSize((char *) &size, 4);
+    sendRequest(MSG_WIN_SIZE, set_windowSize);
+}
+
+void RQRtmpProtocol::sendPeerBandwidth(uint32_t size) {
+    size = htonl(size);
+    std::string set_peerBandwidth((char *) &size, 4);
+    set_peerBandwidth.push_back((char) 0x02);
+    sendRequest(MSG_SET_PEER_BW, set_peerBandwidth);
+}
+
 void RQRtmpProtocol::sendChunkSize(uint32_t size) {
     uint32_t len = htonl(size);
     std::string set_chunk((char *) &len, 4);

@@ -24,6 +24,8 @@ protected:
 
 protected:
     void sendAcknowledgement(uint32_t size);
+    void sendAcknowledgementSize(uint32_t size);
+    void sendPeerBandwidth(uint32_t size);
     void sendChunkSize(uint32_t size);
     void sendUserControl(uint16_t event_type, uint32_t event_data);
     void sendRequest(int cmd, const std::string &str);

@@ -10,7 +10,7 @@ int MP4ReaderMod::OnStart()
     Bind(CMD_HEARTBEAT, &MP4ReaderMod::OnHeartbeat);
 
     _demuxer = std::make_shared<MP4Demuxer>();
-    _demuxer->openMP4("test.mp4");
+    _demuxer->openMP4(_mp4File);
 
     ProtocolOption option;
     // 读取mp4文件并流化时，不重复生成mp4/hls文件  [AUTO-TRANSLATED:5d414546]
@@ -72,7 +72,7 @@ int MP4ReaderMod::OnHeartbeat(const RQMsg::Ptr& msg)
         if (_muxer) {
             _muxer->inputFrame(frame);
         }
-    } while (1);
+    } while (true);
 
     return 0;
 }
