@@ -1,36 +1,36 @@
-# ²éÕÒ GTest
+ï»¿# æŸ¥æ‰¾ GTest
 find_package(GTest REQUIRED)
 
-# »ñÈ¡ËùÓĞ²âÊÔÔ´ÎÄ¼ş
+# è·å–æ‰€æœ‰æµ‹è¯•æºæ–‡ä»¶
 aux_source_directory(. TEST_SOURCES)
 
-# ÎªÃ¿¸ö²âÊÔÔ´ÎÄ¼ş´´½¨¶ÀÁ¢¿ÉÖ´ĞĞÎÄ¼ş
+# ä¸ºæ¯ä¸ªæµ‹è¯•æºæ–‡ä»¶åˆ›å»ºç‹¬ç«‹å¯æ‰§è¡Œæ–‡ä»¶
 foreach(test_source ${TEST_SOURCES})
-    # »ñÈ¡ÎÄ¼şÃû£¨²»´øÀ©Õ¹Ãû£©
+    # è·å–æ–‡ä»¶åï¼ˆä¸å¸¦æ‰©å±•åï¼‰
     get_filename_component(exe_name ${test_source} NAME_WE)
     
-    # ´´½¨¿ÉÖ´ĞĞÎÄ¼ş
+    # åˆ›å»ºå¯æ‰§è¡Œæ–‡ä»¶
     add_executable(${exe_name} ${test_source})
     
-    # Á´½Ó±ØÒªµÄ¿â
+    # é“¾æ¥å¿…è¦çš„åº“
     target_link_libraries(${exe_name} PRIVATE 
 		GTest::gtest
 		GTest::gtest_main
         ${PROJECT_NAME}
     )
     
-    # ×¢²áµ½ CTest
+    # æ³¨å†Œåˆ° CTest
     gtest_discover_tests(${exe_name})
     
-    # ½«²âÊÔ¿ÉÖ´ĞĞÎÄ¼şÌí¼Óµ½ÁĞ±í£¨¿ÉÑ¡£¬ÓÃÓÚÅúÁ¿²Ù×÷£©
+    # å°†æµ‹è¯•å¯æ‰§è¡Œæ–‡ä»¶æ·»åŠ åˆ°åˆ—è¡¨ï¼ˆå¯é€‰ï¼Œç”¨äºæ‰¹é‡æ“ä½œï¼‰
     list(APPEND ALL_TEST_EXECUTABLES ${exe_name})
     
     message(STATUS "add ${exe_name} source(${test_source})")
 endforeach()
 
-# ¿ÉÑ¡£º´´½¨Ò»¸ö×Ü²âÊÔÄ¿±ê£¬ÔËĞĞËùÓĞ²âÊÔ
+# å¯é€‰ï¼šåˆ›å»ºä¸€ä¸ªæ€»æµ‹è¯•ç›®æ ‡ï¼Œè¿è¡Œæ‰€æœ‰æµ‹è¯•
 add_custom_target(run_all_tests
     COMMAND ctest --output-on-failure
     DEPENDS ${ALL_TEST_EXECUTABLES}
-    COMMENT "ÔËĞĞËùÓĞ²âÊÔ"
+    COMMENT "è¿è¡Œæ‰€æœ‰æµ‹è¯•"
 )

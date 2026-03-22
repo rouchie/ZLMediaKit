@@ -13,7 +13,7 @@
 
 #include <fmt/format.h>
 #include <oleidl.h>
-#include <signal.h>
+#include <csignal>
 
 using namespace toolkit;
 using namespace mediakit;
@@ -25,19 +25,19 @@ int main(int argc, char *argv[])
 
     auto mp4ReadMod = CreateModule<MP4ReaderMod>("test.mp4", "live", "stream");
 
-    auto rtspSrv = std::make_shared<TcpServer>();
+    const auto rtspSrv = std::make_shared<TcpServer>();
     rtspSrv->start<mediakit::RtspSession>(554, "::");
 
-    auto rqRtspServer = std::make_shared<TcpServer>();
+    const auto rqRtspServer = std::make_shared<TcpServer>();
     rqRtspServer->start<RQRtspSession>(50554, "::");
 
-    auto rtmpServer = std::make_shared<TcpServer>();
+    const auto rtmpServer = std::make_shared<TcpServer>();
     rtmpServer->start<RtmpSession>(51935, "::");
 
-    auto rqRtmpServer = std::make_shared<TcpServer>();
+    const auto rqRtmpServer = std::make_shared<TcpServer>();
     rqRtmpServer->start<RQRtmpSession>(1935, "::");
 
-    RQHttpServer::Ptr hs = std::make_shared<RQHttpServer>(80);
+    const auto hs = std::make_shared<RQHttpServer>(80);
     hs->POST<ApiHello>("/aa/bb");
     hs->POST<ApiHello>("/aa/cc");
     hs->Start();

@@ -1,38 +1,41 @@
-#include "rqrtmpsession.h"
+﻿#include "rqrtmpsession.h"
 
-RQRtmpSession::RQRtmpSession(const toolkit::Socket::Ptr& sock)
-    : toolkit::Session(sock)
-{
+#include <fmt/format.h>
+
+RQRtmpSession::RQRtmpSession(const toolkit::Socket::Ptr &sock)
+    : toolkit::Session(sock) {
     sock->setSendTimeOutSecond(15);
 }
 
-RQRtmpSession::~RQRtmpSession()
-{
-}
+RQRtmpSession::~RQRtmpSession() = default;
 
-void RQRtmpSession::onRecv(const toolkit::Buffer::Ptr& buf)
-{
+void RQRtmpSession::onRecv(const toolkit::Buffer::Ptr &buf) {
     onParseRtmp(buf->data(), buf->size());
 }
 
-void RQRtmpSession::onError(const toolkit::SockException& err)
-{
-
+void RQRtmpSession::onError(const toolkit::SockException &err) {
+    switch (err.getErrCode()) {
+        case toolkit::Err_reset: {
+            InfoL << fmt::format("{}:用户主动关闭", err.what());
+        } break;
+        default: {
+            ErrorL << fmt::format("{}:{}", static_cast<int>(err.getErrCode()), err.what());
+        } break;
+    }
 }
 
-void RQRtmpSession::onManager()
-{
+void RQRtmpSession::onManager() { }
 
+void RQRtmpSession::onSendMedia(const mediakit::RtmpPacket::Ptr &pkt) {
+    sendRtmp(pkt->type_id, pkt->stream_index, pkt, pkt->time_stamp, pkt->chunk_id);
 }
 
-void RQRtmpSession::onSendRawData(toolkit::Buffer::Ptr buffer)
-{
+void RQRtmpSession::onSendRawData(toolkit::Buffer::Ptr buffer) {
     send(std::move(buffer));
 }
 
-void RQRtmpSession::onRtmpChunk(mediakit::RtmpPacket::Ptr packet)
-{
-    auto &chunk = *packet;
+void RQRtmpSession::onRtmpChunk(mediakit::RtmpPacket::Ptr packet) {
+    const auto &chunk = *packet;
 
     switch (chunk.type_id) {
         case MSG_CMD:
@@ -40,11 +43,12 @@ void RQRtmpSession::onRtmpChunk(mediakit::RtmpPacket::Ptr packet)
             AMFDecoder dec(chunk.buffer, 0, chunk.type_id == MSG_CMD3 ? 3 : 0);
             onProcessCmd(dec);
         } break;
+        default: {
+        } break;
     }
 }
 
-void RQRtmpSession::onProcessCmd(AMFDecoder& dec)
-{
+void RQRtmpSession::onProcessCmd(AMFDecoder &dec) {
     typedef void (RQRtmpSession::*cmd_function)(AMFDecoder &dec);
     static std::unordered_map<std::string, cmd_function> s_cmd_functions;
     static toolkit::onceToken token([]() {
@@ -64,13 +68,14 @@ void RQRtmpSession::onProcessCmd(AMFDecoder& dec)
     (this->*it->second)(dec);
 }
 
-void RQRtmpSession::onCmd_connect(AMFDecoder& dec)
-{
+void RQRtmpSession::onCmd_connect(AMFDecoder &dec) {
+    sendChunkSize(60000);
+
     auto params = dec.load<AMFValue>();
 
     auto tc_url = params["tcUrl"].as_string();
     if (tc_url.empty()) {
-        // defaultVhost:Ĭ��vhost
+        // defaultVhost:默认vhost
         tc_url = std::string(RTMP_SCHEMA) + "://" + DEFAULT_VHOST + "/" + _media_info.app;
     } else {
         auto pos = tc_url.rfind('?');
@@ -99,54 +104,90 @@ void RQRtmpSession::onCmd_connect(AMFDecoder& dec)
     sendResponse(MSG_CMD, invoke.data());
 }
 
-void RQRtmpSession::onCmd_createStream(AMFDecoder& dec)
-{
+void RQRtmpSession::onCmd_createStream(AMFDecoder &dec) {
     sendReply("_result", nullptr, double(STREAM_MEDIA));
 }
 
-void RQRtmpSession::onCmd_play(AMFDecoder &dec)
-{
+void RQRtmpSession::onCmd_play(AMFDecoder &dec) {
     dec.load<AMFValue>(); /* NULL */
     _media_info.stream = dec.load<std::string>();
     _media_info.parse(_media_info.getUrl());
 
-    sendUserControl(CONTROL_STREAM_BEGIN, STREAM_MEDIA);
+    auto f = [this](const mediakit::RtmpMediaSource::Ptr &src) {
+        if (src) {
+            sendUserControl(CONTROL_STREAM_BEGIN, STREAM_MEDIA);
+        }
 
-    std::string level = "status";
-    std::string code = "NetStream.Play.Reset";
-    std::string description = "Resetting and playing.";
+        sendStatus(
+            { "level", "status", "code", "NetStream.Play.Reset", "description", "Resetting and playing.", "details", _media_info.stream, "clientid", "0" });
 
-    sendStatus({ "level", level,
-                 "code", code,
-                 "description", description,
-                 "details", _media_info.stream,
-                 "clientid", "0" });
+        if (!src) {
+            std::string err_msg = fmt::format("no such stream: {}", _media_info.shortUrl());
+            shutdown(toolkit::SockException(toolkit::Err_shutdown, err_msg));
+            return;
+        }
 
-    sendStatus({ "level", "status",
-                 "code", "NetStream.Play.Start",
-                 "description", "Started playing." ,
-                 "details", _media_info.stream,
-                 "clientid", "0"});
+        sendStatus({ "level", "status", "code", "NetStream.Play.Start", "description", "Started playing.", "details", _media_info.stream, "clientid", "0" });
 
-    AMFEncoder invoke;
-    invoke << "|RtmpSampleAccess" << true << true;
-    sendResponse(MSG_DATA, invoke.data());
+        AMFEncoder invoke;
+        invoke << "|RtmpSampleAccess" << true << true;
+        sendResponse(MSG_DATA, invoke.data());
 
-    invoke.clear();
-    AMFValue obj(AMF_OBJECT);
-    obj.set("code", "NetStream.Data.Start");
-    invoke << "onStatus" << obj;
-    sendResponse(MSG_DATA, invoke.data());
+        invoke.clear();
+        AMFValue obj(AMF_OBJECT);
+        obj.set("code", "NetStream.Data.Start");
+        invoke << "onStatus" << obj;
+        sendResponse(MSG_DATA, invoke.data());
 
-    sendStatus({ "level", "status",
-                 "code", "NetStream.Play.PublishNotify",
-                 "description", "Now published." ,
-                 "details", _media_info.stream,
-                 "clientid", "0"});
+        sendStatus(
+            { "level", "status", "code", "NetStream.Play.PublishNotify", "description", "Now published.", "details", _media_info.stream, "clientid", "0" });
+
+        // metadata
+        src->getMetaData([&](const AMFValue &metadata) {
+            invoke.clear();
+            invoke << "onMetaData" << metadata;
+            sendResponse(MSG_DATA, invoke.data());
+        });
+
+        // config frame
+        src->getConfigFrame([&](const mediakit::RtmpPacket::Ptr &pkt) { onSendMedia(pkt); });
+
+        _ring_reader = src->getRing()->attach(getPoller());
+        std::weak_ptr<RQRtmpSession> weak_self = std::static_pointer_cast<RQRtmpSession>(shared_from_this());
+
+        _ring_reader->setGetInfoCB([weak_self]() {
+            toolkit::Any ret;
+            ret.set(std::static_pointer_cast<toolkit::Session>(weak_self.lock()));
+            return ret;
+        });
+
+        _ring_reader->setReadCB([weak_self](const mediakit::RtmpMediaSource::RingDataType &pkt) {
+            const auto strong_self = weak_self.lock();
+            if (!strong_self) {
+                return;
+            }
+            size_t i = 0;
+            const auto size = pkt->size();
+            strong_self->setSendFlushFlag(false);
+            pkt->for_each([&](const mediakit::RtmpPacket::Ptr &rtmp) {
+                if (++i == size) {
+                    strong_self->setSendFlushFlag(true);
+                }
+                strong_self->onSendMedia(rtmp);
+            });
+        });
+
+        src->pause(false);
+        _play_src = src;
+    };
+
+    std::weak_ptr<RQRtmpSession> weak_self = std::static_pointer_cast<RQRtmpSession>(shared_from_this());
+    mediakit::MediaSource::findAsync(_media_info, weak_self.lock(), [weak_self, f](const mediakit::MediaSource::Ptr &src) {
+        f(std::dynamic_pointer_cast<mediakit::RtmpMediaSource>(src));
+    });
 }
 
-void RQRtmpSession::sendStatus(const std::initializer_list<std::string>& key_value)
-{
+void RQRtmpSession::sendStatus(const std::initializer_list<std::string> &key_value) {
     AMFValue status(AMF_OBJECT);
     int i = 0;
     std::string key;
@@ -159,5 +200,3 @@ void RQRtmpSession::sendStatus(const std::initializer_list<std::string>& key_val
     }
     sendReply("onStatus", nullptr, status);
 }
-
-

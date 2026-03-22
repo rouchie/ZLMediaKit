@@ -9,7 +9,7 @@ public:
 
 public:
 	RQRtmpProtocol();
-	virtual ~RQRtmpProtocol();        
+	~RQRtmpProtocol() override;
 
     void onParseRtmp(const char *data, size_t size);
 
@@ -24,6 +24,7 @@ protected:
 
 protected:
     void sendAcknowledgement(uint32_t size);
+    void sendChunkSize(uint32_t size);
     void sendUserControl(uint16_t event_type, uint32_t event_data);
     void sendRequest(int cmd, const std::string &str);
     void sendResponse(int type, const std::string &str);

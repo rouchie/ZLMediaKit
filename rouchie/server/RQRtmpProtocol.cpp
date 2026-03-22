@@ -19,9 +19,7 @@ RQRtmpProtocol::RQRtmpProtocol()
     _next_step_func = [this](const char *data, size_t len) -> const char * { return handle_C0C1(data, len); };
 }
 
-RQRtmpProtocol::~RQRtmpProtocol()
-{
-}
+RQRtmpProtocol::~RQRtmpProtocol() = default;
 
 void RQRtmpProtocol::onParseRtmp(const char* data, size_t size)
 {
@@ -43,6 +41,13 @@ void RQRtmpProtocol::sendAcknowledgement(uint32_t size)
     size = htonl(size);
     std::string acknowledgement((char *) &size, 4);
     sendRequest(MSG_ACK, acknowledgement);
+}
+
+void RQRtmpProtocol::sendChunkSize(uint32_t size) {
+    uint32_t len = htonl(size);
+    std::string set_chunk((char *) &len, 4);
+    sendRequest(MSG_SET_CHUNK, set_chunk);
+    _chunk_size_out = size;
 }
 
 void RQRtmpProtocol::sendUserControl(uint16_t event_type, uint32_t event_data)
@@ -155,7 +160,7 @@ toolkit::BufferRaw::Ptr RQRtmpProtocol::obtainBuffer(const void* data, size_t le
 {
     auto buffer = _packet_pool.obtain2();
     if (data && len) {
-        buffer->assign((const char *) data, len);
+        buffer->assign(static_cast<const char *>(data), len);
     }
     return buffer;
 }
@@ -163,7 +168,7 @@ toolkit::BufferRaw::Ptr RQRtmpProtocol::obtainBuffer(const void* data, size_t le
 void RQRtmpProtocol::handle_C1_simple(const char* data)
 {
     // S0
-    char handshake_head = HANDSHAKE_PLAINTEXT;
+    constexpr char handshake_head = HANDSHAKE_PLAINTEXT;
     onSendRawData(obtainBuffer(&handshake_head, 1));
 
     // S1

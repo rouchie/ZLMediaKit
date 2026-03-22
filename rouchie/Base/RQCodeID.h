@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <unordered_map>
+#include <cstdint>
 
 using code_t = int64_t;
 

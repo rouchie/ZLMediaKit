@@ -3,6 +3,8 @@
 #include "RQDefines.h"
 #include "fmt/format.h"
 
+#include <memory>
+
 class RQMsg : public std::enable_shared_from_this<RQMsg> {
 public:
     using Ptr = std::shared_ptr<RQMsg>;
