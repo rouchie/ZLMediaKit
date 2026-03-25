@@ -77,7 +77,7 @@ int MP4ReaderMod::OnHeartbeat(const RQMsg::Ptr& msg)
     return 0;
 }
 
-uint32_t MP4ReaderMod::getCurrentStamp()
+uint32_t MP4ReaderMod::getCurrentStamp() const
 {
     return _seek_ticker.elapsedTime();
 }

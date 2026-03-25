@@ -8,7 +8,7 @@
 
 using namespace toolkit;
 
-class RQModuleBase {
+class RQModuleBase : public toolkit::noncopyable {
 public:
     using WPtr = std::weak_ptr<RQModuleBase>;
     using Ptr = std::shared_ptr<RQModuleBase>;

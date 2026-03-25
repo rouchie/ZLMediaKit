@@ -7,15 +7,23 @@
 using namespace toolkit;
 using namespace mediakit;
 
-class MP4ReaderMod : public RQModuleHelper<MP4ReaderMod> {
+class RtspMediaSourceMod : public RQModuleHelper<RtspMediaSourceMod>, public mediakit::MediaSink {
 public:
-    MP4ReaderMod(const std::string& mp4File, const std::string& app, const std::string& stream);
+    RtspMediaSourceMod(const std::string& mp4File, const std::string& app, const std::string& stream);
     int OnStart() override;
+
+protected:
+    /// MediaSink
+    bool onTrackReady(const Track::Ptr & track) override;
+    void onAllTrackReady() override;
+    bool onTrackFrame(const Frame::Ptr &frame) override;
 
 private:
     int OnHeartbeat(const RQMsg::Ptr &msg);
 
 private:
+    void OpenSource();
+
     uint32_t getCurrentStamp() const;
     void setCurrentStamp(uint32_t stamp);
 
@@ -23,9 +31,10 @@ private:
     std::string _mp4File;
     std::string _app;
     std::string _stream;
+    std::unordered_map<int, mediakit::Stamp> _stamps;
 
     MP4Demuxer::Ptr _demuxer;
-    MultiMediaSourceMuxer::Ptr _muxer;
+    RtspMediaSourceMuxer::Ptr _muxer;
 
     int64_t _timerHeartbeat = 0;
 

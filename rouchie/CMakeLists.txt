@@ -11,6 +11,10 @@ set(Rouchie_SRC_LIST
 	Module/RtspPlayerMod.h
 	Module/HttpMod.cpp
 	Module/HttpMod.h
+	Module/RtmpMediaSourceMod.cpp
+	Module/RtmpMediaSourceMod.h
+	Module/RtspMediaSourceMod.cpp
+	Module/RtspMediaSourceMod.h
 
 	server/RQRtspSession.cpp
 	server/RQRtspSession.h

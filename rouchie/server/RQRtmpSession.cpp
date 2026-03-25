@@ -286,11 +286,12 @@ void RQRtmpSession::onCmd_publish(AMFDecoder &dec)
     // option.max_track = 16;
 
     _push_src = std::make_shared<mediakit::RtmpMediaSourceImp>(_media_info);
-    _push_src_ownership = _push_src->getOwnership();
     _push_src->setProtocolOption(option);
-
     _push_src->setListener(std::static_pointer_cast<RQRtmpSession>(shared_from_this()));
+
+    _push_src_ownership = _push_src->getOwnership();
     _continue_push_ms = option.continue_push_ms;
+
     sendStatus({"level", "status",
                 "code", "NetStream.Publish.Start",
                 "description", "Started publishing stream.",
