@@ -3,6 +3,7 @@
 #include "Base/RQModuleBase.h"
 #include "Record/MP4Demuxer.h"
 #include "Common/MultiMediaSourceMuxer.h"
+#include "Muxer/RQRtspMediaSourceMuxer.h"
 
 using namespace toolkit;
 using namespace mediakit;
@@ -34,7 +35,8 @@ private:
     std::unordered_map<int, mediakit::Stamp> _stamps;
 
     MP4Demuxer::Ptr _demuxer;
-    RtspMediaSourceMuxer::Ptr _muxer;
+    // RtspMediaSourceMuxer::Ptr _muxer;
+    RQRtspMediaSourceMuxer::Ptr _muxer;
 
     int64_t _timerHeartbeat = 0;
 

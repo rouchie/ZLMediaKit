@@ -39,6 +39,9 @@ set(Rouchie_SRC_LIST
 	Base/RQHttpHelper.h
 	Base/RQHttpServer.cpp
 	Base/RQHttpServer.h
+
+	Muxer/RQRtspMediaSourceMuxer.cpp
+	Muxer/RQRtspMediaSourceMuxer.h
 )
 
 add_library(${PROJECT_NAME} STATIC ${Rouchie_SRC_LIST})

@@ -77,7 +77,8 @@ void RtspMediaSourceMod::OpenSource() {
     tuple.app = _app;
     tuple.stream = _stream;
 
-    _muxer = std::make_shared<RtspMediaSourceMuxer>(tuple, option, std::make_shared<TitleSdp>(0));
+    // _muxer = std::make_shared<RtspMediaSourceMuxer>(tuple, option, std::make_shared<TitleSdp>(0));
+    _muxer = std::make_shared<RQRtspMediaSourceMuxer>(GetPoller(), tuple, std::make_shared<TitleSdp>(0));
 
     uint64_t interval = 10;
 

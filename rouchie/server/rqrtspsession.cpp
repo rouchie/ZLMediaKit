@@ -15,7 +15,10 @@
 using namespace mediakit;
 
 RQRtspSession::RQRtspSession(const toolkit::Socket::Ptr &sock)
-    : toolkit::Session(sock) {}
+    : toolkit::Session(sock) {
+
+    toolkit::mINI::Instance()[Rtsp::kRtpTransportType] = 0;
+}
 
 
 void RQRtspSession::onRecv(const toolkit::Buffer::Ptr &buf)
@@ -86,7 +89,7 @@ void RQRtspSession::handleReq_Options(const mediakit::Parser &parser)
 void RQRtspSession::handleReq_Describe(const mediakit::Parser &parser)
 {
     //该请求中的认证信息
-    auto authorization = parser["Authorization"];
+    const auto& authorization = parser["Authorization"];
     std::weak_ptr<RQRtspSession> weak_self = std::static_pointer_cast<RQRtspSession>(shared_from_this());
 
     //rtsp专属鉴权是否开启事件回调
