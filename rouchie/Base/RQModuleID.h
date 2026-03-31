@@ -11,6 +11,7 @@ using mod_t  = int64_t;
     X(MOD_NONAME,     0)           \
     X(MOD_RTSPPLAYER, 100)         \
     X(MOD_MP4READER,  101)         \
+    X(MOD_RAW_FRAME,  102)         \
     X(MOD_HELLO,      1000)
 
 typedef enum module_id : mod_t{

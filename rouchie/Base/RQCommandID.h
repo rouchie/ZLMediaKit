@@ -5,11 +5,13 @@
 
 using cmd_t = int64_t;
 
-#define CMD_LIST               \
-    X(CMD_START,     1)        \
-    X(CMD_STOP,      2)        \
-    X(CMD_HEARTBEAT, 3)        \
-    X(CMD_HELLO,     3000)
+#define CMD_LIST                \
+    X(CMD_START,      1)        \
+    X(CMD_STOP,       2)        \
+    X(CMD_HEARTBEAT,  3)        \
+    X(CMD_SUBCP_FRAME,1000)     \
+    X(CMD_FRAME_DATA, 1001)     \
+    X(CMD_HELLO,      3000)
 
 typedef enum cmd_id : cmd_t {
 #define X(name, value) name = value,

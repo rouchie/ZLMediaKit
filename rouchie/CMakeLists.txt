@@ -7,6 +7,10 @@ find_package(nlohmann_json CONFIG REQUIRED)
 set(Rouchie_SRC_LIST
 	Module/MP4ReaderMod.cpp
 	Module/MP4ReaderMod.h
+	Module/RawFrameMod.cpp
+	Module/RawFrameMod.h
+	Module/TrackMod.cpp
+	Module/TrackMod.h
 	Module/RtspPlayerMod.cpp
 	Module/RtspPlayerMod.h
 	Module/HttpMod.cpp
@@ -42,6 +46,9 @@ set(Rouchie_SRC_LIST
 
 	Muxer/RQRtspMediaSourceMuxer.cpp
 	Muxer/RQRtspMediaSourceMuxer.h
+
+	Msg/RQFrameMsg.cpp
+	Msg/RQFrameMsg.h
 )
 
 add_library(${PROJECT_NAME} STATIC ${Rouchie_SRC_LIST})

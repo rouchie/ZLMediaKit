@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "RQDefines.h"
 #include "fmt/format.h"
@@ -11,6 +11,7 @@ public:
 
 public:
     RQMsg(mod_t sender, mod_t recver, cmd_t cmd);
+    virtual ~RQMsg() = default;
 
 public:
     RQMsg::Ptr Set(int value);
