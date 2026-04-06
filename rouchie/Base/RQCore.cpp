@@ -63,7 +63,7 @@ void RQCore::AddModule(mod_t id, RQModuleBase::Ptr module)
 
     std::lock_guard<std::recursive_mutex> lock(_mutex);
 
-    auto range = _mapModules.equal_range(id);
+    const auto range = _mapModules.equal_range(id);
     for (auto it = range.first; it != range.second; ++it) {
         if (auto locked = it->second.lock()) {
             if (locked == module) {

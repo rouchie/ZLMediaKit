@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "Base/RQModuleBase.h"
+#include "Base/RQModuleHelper.h"
 #include "Record/MP4Demuxer.h"
 #include "Common/MultiMediaSourceMuxer.h"
 #include "Muxer/RQRtspMediaSourceMuxer.h"

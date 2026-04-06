@@ -1,52 +1,47 @@
 #include "RQRtspSession.h"
 #include "Common/MediaSource.h"
+#include "Common/config.h"
+#include "Common/macros.h"
 #include "Rtsp/Rtsp.h"
+#include "Util/MD5.h"
+#include "Util/base64.h"
 #include "Util/logger.h"
 #include <cstddef>
 #include <fmt/format.h>
-#include "Common/macros.h"
-#include "Common/config.h"
-#include "Util/MD5.h"
-#include "Util/base64.h"
 
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
 
 using namespace mediakit;
 
 RQRtspSession::RQRtspSession(const toolkit::Socket::Ptr &sock)
     : toolkit::Session(sock) {
-
-    toolkit::mINI::Instance()[Rtsp::kRtpTransportType] = 0;
+    // toolkit::mINI::Instance()[Rtsp::kRtpTransportType] = 0;
 }
 
-
-void RQRtspSession::onRecv(const toolkit::Buffer::Ptr &buf)
-{
+void RQRtspSession::onRecv(const toolkit::Buffer::Ptr &buf) {
     _bytes_usage += buf->size();
     input(buf->data(), buf->size());
 }
 
-void RQRtspSession::onError(const toolkit::SockException &err)
-{
+void RQRtspSession::onError(const toolkit::SockException &err) { }
 
-}
-
-void RQRtspSession::onManager()
-{
+void RQRtspSession::onManager() {
     // InfoL << fmt::format("Total traffic consumed: {}", _bytes_usage);
 }
 
-void RQRtspSession::onWholeRtspPacket(mediakit::Parser &parser)
-{
-    std::string method = parser.method(); //提取出请求命令字
+void RQRtspSession::onWholeRtspPacket(mediakit::Parser &parser) {
+    std::string method = parser.method(); // 提取出请求命令字
     _cseq = atoi(parser["CSeq"].data());
 
     if (_content_base.empty()) {
+        const auto &url = parser.url();
+        const auto &fullUrl = parser.fullUrl();
+
         mediakit::RtspUrl rtsp;
-        rtsp.parse(parser.url());
+        rtsp.parse(url);
         _content_base = rtsp._url;
-        _media_info.parse(parser.fullUrl());
+        _media_info.parse(fullUrl);
         _media_info.schema = RTSP_SCHEMA;
         _media_info.protocol = overSsl() ? "rtsps" : "rtsp";
     }
@@ -66,7 +61,7 @@ void RQRtspSession::onWholeRtspPacket(mediakit::Parser &parser)
         s_cmd_functions.emplace("GET_PARAMETER", &RQRtspSession::handleReq_SET_PARAMETER);
     });
 
-    auto it = s_cmd_functions.find(method);
+    const auto it = s_cmd_functions.find(method);
     if (it == s_cmd_functions.end()) {
         sendRtspResponse("403 Forbidden");
         throw toolkit::SockException(toolkit::Err_shutdown, StrPrinter << "403 Forbidden:" << method);
@@ -76,38 +71,35 @@ void RQRtspSession::onWholeRtspPacket(mediakit::Parser &parser)
     parser.clear();
 }
 
-void RQRtspSession::onRtpPacket(const char *data,size_t len)
-{
+void RQRtspSession::onRtpPacket(const char *data, size_t len) {
     InfoL << fmt::format("recv rtp[{}] packet size: {}", data[1], len);
 }
 
-void RQRtspSession::handleReq_Options(const mediakit::Parser &parser)
-{
-    sendRtspResponse("200 OK",{"Public" , "OPTIONS, DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE, ANNOUNCE, RECORD, SET_PARAMETER, GET_PARAMETER"});
+void RQRtspSession::handleReq_Options(const mediakit::Parser &parser) {
+    sendRtspResponse("200 OK", { "Public", "OPTIONS, DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE, ANNOUNCE, RECORD, SET_PARAMETER, GET_PARAMETER" });
 }
 
-void RQRtspSession::handleReq_Describe(const mediakit::Parser &parser)
-{
-    //该请求中的认证信息
-    const auto& authorization = parser["Authorization"];
+void RQRtspSession::handleReq_Describe(const mediakit::Parser &parser) {
+    // 该请求中的认证信息
+    const auto &authorization = parser["Authorization"];
     std::weak_ptr<RQRtspSession> weak_self = std::static_pointer_cast<RQRtspSession>(shared_from_this());
 
-    //rtsp专属鉴权是否开启事件回调
+    // rtsp专属鉴权是否开启事件回调
     auto invoker = [weak_self, authorization](const std::string &realm) {
         auto strong_self = weak_self.lock();
         if (!strong_self) {
-            //本对象已经销毁
+            // 本对象已经销毁
             return;
         }
-        //切换到自己的线程然后执行
+        // 切换到自己的线程然后执行
         strong_self->async([weak_self, realm, authorization]() {
             auto strong_self = weak_self.lock();
             if (!strong_self) {
-                //本对象已经销毁
+                // 本对象已经销毁
                 return;
             }
 
-            //该流需要rtsp专属认证，开启rtsp专属认证后，将不再触发url通用鉴权认证(on_play)
+            // 该流需要rtsp专属认证，开启rtsp专属认证后，将不再触发url通用鉴权认证(on_play)
             strong_self->_rtsp_realm = realm;
             strong_self->onAuthUser(realm, authorization);
         });
@@ -116,29 +108,23 @@ void RQRtspSession::handleReq_Describe(const mediakit::Parser &parser)
     invoker("rouchie");
 }
 
-void RQRtspSession::handleReq_Setup(const mediakit::Parser &parser)
-{
+void RQRtspSession::handleReq_Setup(const mediakit::Parser &parser) {
     static auto getRtpTypeStr = [](const int type) {
-        switch (type)
-        {
-        case Rtsp::RTP_TCP:
-            return "TCP";
-        case Rtsp::RTP_UDP:
-            return "UDP";
-        case Rtsp::RTP_MULTICAST:
-            return "MULTICAST";
-        default:
-            return "INVALID";
+        switch (type) {
+            case Rtsp::RTP_TCP: return "TCP";
+            case Rtsp::RTP_UDP: return "UDP";
+            case Rtsp::RTP_MULTICAST: return "MULTICAST";
+            default: return "INVALID";
         }
     };
 
     InfoL << fmt::format("fullUrl[{}] controlUrl[{}]", parser.fullUrl(), _sdp_track[0]->getControlUrl(_content_base));
 
-    int trackIdx = getTrackIndexByControlUrl(parser.fullUrl());
+    const int trackIdx = getTrackIndexByControlUrl(parser.fullUrl());
 
-    SdpTrack::Ptr &trackRef = _sdp_track[trackIdx];
+    const SdpTrack::Ptr &trackRef = _sdp_track[trackIdx];
     if (trackRef->_inited) {
-        //已经初始化过该Track
+        // 已经初始化过该Track
         throw toolkit::SockException(toolkit::Err_shutdown, "can not setup one track twice");
     }
 
@@ -153,11 +139,11 @@ void RQRtspSession::handleReq_Setup(const mediakit::Parser &parser)
             rtpType = Rtsp::RTP_UDP;
         }
 
-        //检查RTP传输类型限制
+        // 检查RTP传输类型限制
         GET_CONFIG(int, transportType, Rtsp::kRtpTransportType);
         if (transportType != Rtsp::RTP_Invalid && transportType != rtpType) {
             WarnL << "rtsp client setup transport " << getRtpTypeStr(rtpType) << " but config force transport " << getRtpTypeStr(transportType);
-            //配置限定RTSP传输方式，但是客户端握手方式不一致，返回461
+            // 配置限定RTSP传输方式，但是客户端握手方式不一致，返回461
             sendRtspResponse("461 Unsupported transport");
             return;
         }
@@ -165,44 +151,83 @@ void RQRtspSession::handleReq_Setup(const mediakit::Parser &parser)
         _rtp_type = rtpType;
     }
 
-    trackRef->_inited = true; //现在初始化
+    trackRef->_inited = true; // 现在初始化
 
-    //允许接收rtp、rtcp包
+    // 允许接收rtp、rtcp包
     RtspSplitter::enableRecvRtp(_rtp_type == Rtsp::RTP_TCP);
 
     switch (_rtp_type) {
-    case Rtsp::RTP_TCP: {
-        if (_push_src) {
-            // rtsp推流时，interleaved由推流者决定
-            auto key_values = Parser::parseArgs(parser["Transport"], ";", "=");
-            int interleaved_rtp = -1, interleaved_rtcp = -1;
-            if (2 == sscanf(key_values["interleaved"].data(), "%d-%d", &interleaved_rtp, &interleaved_rtcp)) {
-                trackRef->_interleaved = interleaved_rtp;
+        case Rtsp::RTP_TCP: {
+            if (_push_src) {
+                // rtsp推流时，interleaved由推流者决定
+                auto key_values = Parser::parseArgs(parser["Transport"], ";", "=");
+                int interleaved_rtp = -1, interleaved_rtcp = -1;
+                if (2 == sscanf(key_values["interleaved"].data(), "%d-%d", &interleaved_rtp, &interleaved_rtcp)) {
+                    trackRef->_interleaved = interleaved_rtp;
+                } else {
+                    throw toolkit::SockException(toolkit::Err_shutdown, "can not find interleaved when setup of rtp over tcp");
+                }
             } else {
-                throw toolkit::SockException(toolkit::Err_shutdown, "can not find interleaved when setup of rtp over tcp");
+                // rtsp播放时，由于数据共享分发，所以interleaved必须由服务器决定
+                trackRef->_interleaved = 2 * trackRef->_type;
             }
-        } else {
-            // rtsp播放时，由于数据共享分发，所以interleaved必须由服务器决定
-            trackRef->_interleaved = 2 * trackRef->_type;
-        }
 
-        auto transport = fmt::format("RTP/AVP/TCP;unicast;interleaved={}-{};ssrc={};", trackRef->_interleaved, trackRef->_interleaved+1, printSSRC(trackRef->_ssrc));
-        sendRtspResponse("200 OK", {"Transport", transport});
-    } break;
-    default:
-        break;
+            auto transport
+                = fmt::format("RTP/AVP/TCP;unicast;interleaved={}-{};ssrc={};", trackRef->_interleaved, trackRef->_interleaved + 1, printSSRC(trackRef->_ssrc));
+            sendRtspResponse("200 OK", { "Transport", transport });
+        } break;
+        case Rtsp::RTP_UDP: {
+            std::pair<toolkit::Socket::Ptr, toolkit::Socket::Ptr> pr = std::make_pair(this->createSocket(), this->createSocket());
+            try {
+                makeSockPair(pr, get_local_ip());
+            } catch (std::exception &ex) {
+                send_NotAcceptable();
+                throw toolkit::SockException(toolkit::Err_shutdown, ex.what());
+            }
+
+            _rtp_socks[trackIdx] = pr.first;
+            _rtcp_socks[trackIdx] = pr.second;
+
+            // Transport: RTP/AVP/UDP;unicast;client_port=28116-28117
+            const std::string strClientPorts = findSubString(parser["Transport"].data(), "client_port=", nullptr);
+            uint16_t rtpPort = 0;
+            uint16_t rtcpPort = 0;
+            if (strClientPorts.empty() || 2 != sscanf(strClientPorts.data(), "%hu-%hu", &rtpPort, &rtcpPort)) {
+                send_NotAcceptable();
+                throw toolkit::SockException(toolkit::Err_shutdown, "bad client_port");
+            }
+
+            {
+                // 设置rtp发送目标地址
+                auto peerAddr = toolkit::SockUtil::make_sockaddr(get_peer_ip().data(), rtpPort);
+                pr.first->bindPeerAddr(reinterpret_cast<struct sockaddr *>(&peerAddr), 0, true);
+            }
+
+            {
+                // 设置rtcp发送目标地址
+                auto peerAddr = toolkit::SockUtil::make_sockaddr(get_peer_ip().data(), rtcpPort);
+                pr.second->bindPeerAddr(reinterpret_cast<struct sockaddr *>(&peerAddr), 0, true);
+            }
+
+            startListenPeerUdpData(trackIdx);
+
+            const std::string transport = fmt::format(
+                "RTP/AVP/UDP;unicast;client_port={};server_port={}-{};ssrc={}", strClientPorts, pr.first->get_local_port(), pr.second->get_local_port(),
+                printSSRC(trackRef->_ssrc));
+            sendRtspResponse("200 OK", { "Transport", transport });
+        } break;
+        default: break;
     }
 }
 
-void RQRtspSession::handleReq_Play(const mediakit::Parser &parser)
-{
+void RQRtspSession::handleReq_Play(const mediakit::Parser &parser) {
     if (_sdp_track.empty() || parser["Session"] != _sessionid) {
         send_SessionNotFound();
         throw toolkit::SockException(toolkit::Err_shutdown, _sdp_track.empty() ? "can not find any available track when play" : "session not found when play");
     }
 
     auto play_src = _play_src.lock();
-    if(!play_src){
+    if (!play_src) {
         send_StreamNotFound();
         throw toolkit::SockException(toolkit::Err_shutdown, "rtsp stream released");
     }
@@ -221,7 +246,7 @@ void RQRtspSession::handleReq_Play(const mediakit::Parser &parser)
         auto &track = _sdp_track[i];
 
         if (track->_inited == false) {
-            //为支持播放器播放单一track, 不校验没有发setup的track
+            // 为支持播放器播放单一track, 不校验没有发setup的track
             continue;
         }
         inited_tracks.emplace_back(track->_type);
@@ -235,13 +260,13 @@ void RQRtspSession::handleReq_Play(const mediakit::Parser &parser)
 
         rtp_info << "url=" << track->getControlUrl(_content_base) << ";"
                  << "seq=" << track->_seq << ";"
-                 << "rtptime=" << (int64_t)(track->_time_stamp) * (int64_t)(track->_samplerate/ 1000);
+                 << "rtptime=" << static_cast<int64_t>(track->_time_stamp) * static_cast<int64_t>(track->_samplerate / 1000);
     }
 
     res_header.emplace("RTP-Info", rtp_info);
     sendRtspResponse("200 OK", res_header);
 
-    //在回复rtsp信令后再恢复播放
+    // 在回复rtsp信令后再恢复播放
     play_src->pause(false);
 
     if (!_play_reader && _rtp_type != Rtsp::RTP_MULTICAST) {
@@ -272,8 +297,7 @@ void RQRtspSession::handleReq_Play(const mediakit::Parser &parser)
     }
 }
 
-void RQRtspSession::handleReq_Pause(const mediakit::Parser &parser)
-{
+void RQRtspSession::handleReq_Pause(const mediakit::Parser &parser) {
     if (parser["Session"] != _sessionid) {
         send_SessionNotFound();
         throw toolkit::SockException(toolkit::Err_shutdown, "session not found when pause");
@@ -288,25 +312,23 @@ void RQRtspSession::handleReq_Pause(const mediakit::Parser &parser)
 
 void RQRtspSession::handleReq_Teardown(const Parser &parser) {
     _push_src = nullptr;
-    //此时回复可能触发broken pipe事件，从而直接触发onError回调；所以需要先把_push_src置空，防止触发断流续推功能
+    // 此时回复可能触发broken pipe事件，从而直接触发onError回调；所以需要先把_push_src置空，防止触发断流续推功能
     sendRtspResponse("200 OK");
-    throw toolkit::SockException(toolkit::Err_shutdown,"recv teardown request");
+    throw toolkit::SockException(toolkit::Err_shutdown, "recv teardown request");
 }
 
-void RQRtspSession::handleReq_SET_PARAMETER(const Parser &parser)
-{
+void RQRtspSession::handleReq_SET_PARAMETER(const Parser &parser) {
     sendRtspResponse("200 OK");
 }
 
-void RQRtspSession::onAuthUser(const std::string &realm, const std::string &authorization)
-{
-    if(authorization.empty()){
+void RQRtspSession::onAuthUser(const std::string &realm, const std::string &authorization) {
+    if (authorization.empty()) {
         onAuthFailed(realm, "", false);
         return;
     }
 
-    // Digest username="admin", realm="rouchie", nonce="AGeIMVTgbp8JmGDHH6yFYwmUCd7hPzcI", uri="rtsp://localhost:50554/live/stream", response="55633eb5edd170e401f79b197651ddd6"
-    // Basic YWRtaW46YWRtaW4=
+    // Digest username="admin", realm="rouchie", nonce="AGeIMVTgbp8JmGDHH6yFYwmUCd7hPzcI", uri="rtsp://localhost:50554/live/stream",
+    // response="55633eb5edd170e401f79b197651ddd6" Basic YWRtaW46YWRtaW4=
     InfoL << fmt::format("realm[{}] authorization[{}]", realm, authorization);
 
     // 按空格分割 authorization 为前后两部分
@@ -315,27 +337,27 @@ void RQRtspSession::onAuthUser(const std::string &realm, const std::string &auth
         onAuthFailed(realm, "Invalid authorization format");
         return;
     }
-    
+
     std::string authType = authorization.substr(0, space_pos); // 空格前的内容：Basic 或 Digest
-    std::string authContent = authorization.substr(space_pos + 1);   // 空格后的内容：认证凭据
+    std::string authContent = authorization.substr(space_pos + 1); // 空格后的内容：认证凭据
 
     if (authType == "Basic") {
     } else if (authType == "Digest") {
-        //md5认证
+        // md5认证
         onAuthDigest(realm, authContent);
     } else {
         onAuthFailed(realm, fmt::format("Unsupported authorization type: {}", authType), false);
     }
 }
 
-void RQRtspSession::onAuthDigest(const std::string &realm, const std::string &auth_md5){
+void RQRtspSession::onAuthDigest(const std::string &realm, const std::string &auth_md5) {
     DebugP(this) << auth_md5;
 
     auto mapTmp = Parser::parseArgs(auth_md5, ",", "=");
     decltype(mapTmp) map;
 
-    for(auto &pr : mapTmp){
-        map[toolkit::trim(std::string(pr.first)," \"")] = toolkit::trim(pr.second," \"");
+    for (auto &pr : mapTmp) {
+        map[toolkit::trim(std::string(pr.first), " \"")] = toolkit::trim(pr.second, " \"");
     }
 
     auto nonce = map["nonce"];
@@ -343,27 +365,27 @@ void RQRtspSession::onAuthDigest(const std::string &realm, const std::string &au
     auto uri = map["uri"];
     auto response = map["response"];
 
-    //check realm
-    if(realm != map["realm"]){
-        onAuthFailed(realm,StrPrinter << "realm not mached:" << realm << " != " << map["realm"]);
+    // check realm
+    if (realm != map["realm"]) {
+        onAuthFailed(realm, StrPrinter << "realm not mached:" << realm << " != " << map["realm"]);
         return;
     }
 
-    //check nonce
-    if(_auth_nonce != nonce){
-        onAuthFailed(realm,StrPrinter << "nonce not mached:" << nonce << " != " << _auth_nonce);
+    // check nonce
+    if (_auth_nonce != nonce) {
+        onAuthFailed(realm, StrPrinter << "nonce not mached:" << nonce << " != " << _auth_nonce);
         return;
     }
 
-    //check username and uri
-    if(username.empty() || uri.empty() || response.empty()){
-        onAuthFailed(realm,StrPrinter << "username/uri/response empty:" << username << "," << uri << "," << response);
+    // check username and uri
+    if (username.empty() || uri.empty() || response.empty()) {
+        onAuthFailed(realm, StrPrinter << "username/uri/response empty:" << username << "," << uri << "," << response);
         return;
     }
 
-    auto realInvoker = [this,realm,nonce,uri,username,response](bool ignoreAuth, bool encrypted, const std::string &good_pwd){
-        if(ignoreAuth){
-            //忽略认证
+    auto realInvoker = [this, realm, nonce, uri, username, response](bool ignoreAuth, bool encrypted, const std::string &good_pwd) {
+        if (ignoreAuth) {
+            // 忽略认证
             TraceP(this) << "auth ignored";
             onAuthSuccess();
             return;
@@ -377,18 +399,18 @@ void RQRtspSession::onAuthDigest(const std::string &realm, const std::string &au
             response= md5( md5(username:realm:password):nonce:md5(public_method:url) );
          */
         auto encrypted_pwd = good_pwd;
-        if(!encrypted){
-            //提供的是明文密码
-            encrypted_pwd = toolkit::MD5(username+ ":" + realm + ":" + good_pwd).hexdigest();
+        if (!encrypted) {
+            // 提供的是明文密码
+            encrypted_pwd = toolkit::MD5(username + ":" + realm + ":" + good_pwd).hexdigest();
         }
 
         auto good_response = toolkit::MD5(encrypted_pwd + ":" + nonce + ":" + toolkit::MD5(std::string("DESCRIBE") + ":" + uri).hexdigest()).hexdigest();
-        if(strcasecmp(good_response.data(),response.data()) == 0){
-            //认证成功！md5不区分大小写
+        if (strcasecmp(good_response.data(), response.data()) == 0) {
+            // 认证成功！md5不区分大小写
             onAuthSuccess();
-        }else{
-            //认证失败！
-            onAuthFailed(realm, StrPrinter << "password mismatch when md5 auth:" << good_response << " != " << response );
+        } else {
+            // 认证失败！
+            onAuthFailed(realm, StrPrinter << "password mismatch when md5 auth:" << good_response << " != " << response);
         }
     };
 
@@ -398,26 +420,26 @@ void RQRtspSession::onAuthDigest(const std::string &realm, const std::string &au
 void RQRtspSession::onAuthSuccess() {
     std::weak_ptr<RQRtspSession> weak_self = std::static_pointer_cast<RQRtspSession>(shared_from_this());
 
-    MediaSource::findAsync(_media_info, weak_self.lock(), [weak_self](const MediaSource::Ptr &src){
-        auto strong_self = weak_self.lock();
-        if(!strong_self){
+    MediaSource::findAsync(_media_info, weak_self.lock(), [weak_self](const MediaSource::Ptr &src) {
+        const auto strong_self = weak_self.lock();
+        if (!strong_self) {
             return;
         }
 
-        auto rtsp_src = std::dynamic_pointer_cast<RtspMediaSource>(src);
+        const auto rtsp_src = std::dynamic_pointer_cast<RtspMediaSource>(src);
         if (!rtsp_src) {
-            //未找到相应的MediaSource
+            // 未找到相应的MediaSource
             std::string err = fmt::format("no such stream: {}", strong_self->_media_info.shortUrl());
             strong_self->send_StreamNotFound();
-            strong_self->shutdown(toolkit::SockException(toolkit::Err_shutdown,err));
+            strong_self->shutdown(toolkit::SockException(toolkit::Err_shutdown, err));
             return;
         }
 
-        InfoL << rtsp_src->getSdp();
+        InfoL << "\n" << rtsp_src->getSdp();
 
         strong_self->_sdp_track = mediakit::SdpParser(rtsp_src->getSdp()).getAvailableTrack();
         if (strong_self->_sdp_track.empty()) {
-            //未找到可用的Track
+            // 未找到可用的Track
             std::string err = fmt::format("no available track: {}", strong_self->_media_info.shortUrl());
             strong_self->send_StreamNotFound();
             strong_self->shutdown(toolkit::SockException(toolkit::Err_shutdown, err));
@@ -430,7 +452,7 @@ void RQRtspSession::onAuthSuccess() {
         }
 
         strong_self->_sessionid = toolkit::makeRandStr(12);
-        for(auto &track : strong_self->_sdp_track){
+        for (const auto &track : strong_self->_sdp_track) {
             auto ssrc = rtsp_src->getSsrc(track->_type);
             auto seq = rtsp_src->getSequence(track->_type);
             auto time_stamp = rtsp_src->getTimeStamp(track->_type);
@@ -444,15 +466,12 @@ void RQRtspSession::onAuthSuccess() {
 
         strong_self->_play_src = rtsp_src;
 
-        strong_self->sendRtspResponse("200 OK",
-            {"Content-Base", strong_self->_content_base + "/"},
-            rtsp_src->getSdp());
+        strong_self->sendRtspResponse("200 OK", { "Content-Base", strong_self->_content_base + "/" }, rtsp_src->getSdp());
     });
 }
 
-void RQRtspSession::onAuthFailed(const std::string &realm, const std::string &why, bool close)
-{
-    ::toolkit::mINI::Instance()[Rtsp::kAuthBasic] = false; 
+void RQRtspSession::onAuthFailed(const std::string &realm, const std::string &why, bool close) {
+    ::toolkit::mINI::Instance()[Rtsp::kAuthBasic] = false;
     GET_CONFIG(bool, authBasic, Rtsp::kAuthBasic);
 
     if (!authBasic) {
@@ -469,8 +488,7 @@ void RQRtspSession::onAuthFailed(const std::string &realm, const std::string &wh
     }
 }
 
-int RQRtspSession::getTrackIndexByControlUrl(const std::string &control_url)
-{
+int RQRtspSession::getTrackIndexByControlUrl(const std::string &control_url) {
     for (size_t i = 0; i < _sdp_track.size(); ++i) {
         if (control_url.find(_sdp_track[i]->getControlUrl(_content_base)) == 0) {
             return i;
@@ -494,8 +512,7 @@ int RQRtspSession::getTrackIndexByTrackType(mediakit::TrackType type) {
     throw toolkit::SockException(toolkit::Err_shutdown, StrPrinter << "no such track with type:" << getTrackString(type));
 }
 
-void RQRtspSession::sendRtpPacket(const mediakit::RtspMediaSource::RingDataType &pkt)
-{
+void RQRtspSession::sendRtpPacket(const mediakit::RtspMediaSource::RingDataType &pkt) {
     switch (_rtp_type) {
         case Rtsp::RTP_TCP: {
             setSendFlushFlag(false);
@@ -506,12 +523,32 @@ void RQRtspSession::sendRtpPacket(const mediakit::RtspMediaSource::RingDataType 
             flushAll();
             setSendFlushFlag(true);
         } break;
+        case Rtsp::RTP_UDP: {
+            toolkit::Socket::Ptr rtp_socks[2];
+            rtp_socks[TrackVideo] = _rtp_socks[getTrackIndexByTrackType(TrackVideo)];
+            rtp_socks[TrackAudio] = _rtp_socks[getTrackIndexByTrackType(TrackAudio)];
+            pkt->for_each([&](const RtpPacket::Ptr &rtp) {
+                updateRtcpContext(rtp);
+                const auto &sock = rtp_socks[rtp->type];
+                if (!sock) {
+                    // rtp socket未准备好
+                    shutdown(toolkit::SockException(toolkit::Err_shutdown, "udp sock not opened yet"));
+                    return;
+                }
+                _bytes_usage += rtp->size() - RtpPacket::kRtpTcpHeaderSize;
+                sock->send(std::make_shared<toolkit::BufferOffset<toolkit::Buffer::Ptr>>(rtp, RtpPacket::kRtpTcpHeaderSize), nullptr, 0, false);
+            });
+            for (auto &sock : rtp_socks) {
+                if (sock) {
+                    sock->flushAll();
+                }
+            }
+        } break;
         default: break;
     }
 }
 
-void RQRtspSession::updateRtcpContext(const mediakit::RtpPacket::Ptr &rtp)
-{
+void RQRtspSession::updateRtcpContext(const mediakit::RtpPacket::Ptr &rtp) {
     int track_index = getTrackIndexByTrackType(rtp->type);
     auto &rtcp_ctx = _rtcp_context[track_index];
 
@@ -523,7 +560,7 @@ void RQRtspSession::updateRtcpContext(const mediakit::RtpPacket::Ptr &rtp)
 
     auto &ticker = _rtcp_send_tickers[track_index];
     if (ticker.elapsedTime() > 5 * 1000 || _send_sr_rtcp[track_index]) {
-        //确保在发送rtp前，先发送一次sender report rtcp(用于播放器同步音视频)
+        // 确保在发送rtp前，先发送一次sender report rtcp(用于播放器同步音视频)
         ticker.resetTime();
         _send_sr_rtcp[track_index] = false;
 
@@ -537,77 +574,155 @@ void RQRtspSession::updateRtcpContext(const mediakit::RtpPacket::Ptr &rtp)
 
         auto ssrc = rtp->getSSRC();
         auto rtcp = rtcp_ctx->createRtcpSR(ssrc);
-        auto rtcp_sdes = RtcpSdes::create({kServerName});
+        auto rtcp_sdes = RtcpSdes::create({ kServerName });
         rtcp_sdes->chunks.type = (uint8_t)SdesType::RTCP_SDES_CNAME;
         rtcp_sdes->chunks.ssrc = htonl(ssrc);
         send_rtcp(this, track_index, std::move(rtcp));
         send_rtcp(this, track_index, RtcpHeader::toBuffer(rtcp_sdes));
     }
-
 }
 
-bool RQRtspSession::sendRtspResponse(const std::string &res_code, const std::initializer_list<std::string> &header, const std::string &sdp, const char *protocol)
-{
+void RQRtspSession::onRcvPeerUdpData(int interleaved, const toolkit::Buffer::Ptr &buf, const struct sockaddr_storage &addr) {
+    if (interleaved % 2 == 0) {
+        // rtp over udp
+        if (!_udp_connected_flags.count(interleaved)) {
+            _udp_connected_flags.emplace(interleaved);
+            if (_rtp_socks[interleaved / 2]) {
+                _rtp_socks[interleaved / 2]->bindPeerAddr((struct sockaddr *)&addr);
+            }
+        }
+    } else {
+        // rtcp over udp
+        if (!_udp_connected_flags.count(interleaved)) {
+            _udp_connected_flags.emplace(interleaved);
+            if (_rtcp_socks[interleaved / 2]) {
+                _rtcp_socks[interleaved / 2]->bindPeerAddr((struct sockaddr *)&addr);
+            }
+        }
+        onRtcpPacket(interleaved / 2, _sdp_track[interleaved / 2], buf->data(), buf->size());
+    }
+}
+
+void RQRtspSession::onRtcpPacket(int track_idx, mediakit::SdpTrack::Ptr &track, const char *data, size_t len) {
+    const auto rtcp_arr = RtcpHeader::loadFromBytes(const_cast<char *>(data), len);
+    for (auto &rtcp : rtcp_arr) {
+        InfoL << "RTCP pt: " << static_cast<int>(rtcp->pt);
+    }
+}
+
+void RQRtspSession::startListenPeerUdpData(int track_idx) {
+    std::weak_ptr<RQRtspSession> weak_self = std::static_pointer_cast<RQRtspSession>(shared_from_this());
+    auto peer_ip = get_peer_ip();
+
+    auto onUdpData = [weak_self, peer_ip](const toolkit::Buffer::Ptr &buf, struct sockaddr *peer_addr, int interleaved) {
+        const auto strong_self = weak_self.lock();
+        if (!strong_self) {
+            return false;
+        }
+
+        if (toolkit::SockUtil::inet_ntoa(peer_addr) != peer_ip) {
+            WarnP(strong_self.get()) << "收到非法数据包:" << peer_ip << ":" << toolkit::SockUtil::inet_ntoa(peer_addr) << ":" << interleaved;
+            return true;
+        }
+
+        struct sockaddr_storage addr = *reinterpret_cast<struct sockaddr_storage *>(peer_addr);
+        strong_self->async([weak_self, buf, addr, interleaved]() {
+            const auto strong_self = weak_self.lock();
+            if (!strong_self) {
+                return;
+            }
+
+            try {
+                strong_self->onRcvPeerUdpData(interleaved, buf, addr);
+            } catch (toolkit::SockException &ex) {
+                strong_self->shutdown(ex);
+            } catch (std::exception &ex) {
+                strong_self->shutdown(toolkit::SockException(toolkit::Err_other, ex.what()));
+            }
+        });
+
+        return true;
+    };
+
+    switch (_rtp_type) {
+        case Rtsp::RTP_UDP: {
+            auto setEvent = [&](const toolkit::Socket::Ptr &sock, int interleaved) {
+                if (!sock) {
+                    WarnP(this) << "udp端口为空:" << interleaved;
+                    return;
+                }
+                sock->setOnRead(
+                    [onUdpData, interleaved](const toolkit::Buffer::Ptr &buf, struct sockaddr *addr, int addr_len) { onUdpData(buf, addr, interleaved); });
+            };
+            setEvent(_rtp_socks[track_idx], track_idx * 2);
+            setEvent(_rtcp_socks[track_idx], track_idx * 2 + 1);
+        } break;
+        default: {
+        } break;
+    }
+}
+
+bool RQRtspSession::sendRtspResponse(
+    const std::string &res_code, const std::initializer_list<std::string> &header, const std::string &sdp, const char *protocol) {
     std::string key;
     mediakit::StrCaseMap header_map;
     int i = 0;
-    for(auto &val : header){
-        if(++i % 2 == 0){
-            header_map.emplace(key,val);
-        }else{
+    for (auto &val : header) {
+        if (++i % 2 == 0) {
+            header_map.emplace(key, val);
+        } else {
             key = val;
         }
     }
     return sendRtspResponse(res_code, header_map, sdp, protocol);
 }
 
-static std::string dateStr()
-{
+static std::string dateStr() {
     char buf[64];
     time_t tt = time(NULL);
     strftime(buf, sizeof buf, "%a, %b %d %Y %H:%M:%S GMT", gmtime(&tt));
     return buf;
 }
 
-bool RQRtspSession::sendRtspResponse(const std::string &res_code, const mediakit::StrCaseMap &header_const, const std::string &sdp, const char *protocol)
-{
+bool RQRtspSession::sendRtspResponse(const std::string &res_code, const mediakit::StrCaseMap &header_const, const std::string &sdp, const char *protocol) {
     auto header = header_const;
-    header.emplace("CSeq",StrPrinter << _cseq);
+    header.emplace("CSeq", StrPrinter << _cseq);
 
-    if(!_sessionid.empty()){
+    if (!_sessionid.empty()) {
         header.emplace("Session", _sessionid);
     }
 
     header.emplace("Server", kRouchieServerName);
     header.emplace("Date", dateStr());
 
-    if(!sdp.empty()){
-        header.emplace("Content-Length",StrPrinter << sdp.size());
-        header.emplace("Content-Type","application/sdp");
+    if (!sdp.empty()) {
+        header.emplace("Content-Length", StrPrinter << sdp.size());
+        header.emplace("Content-Type", "application/sdp");
     }
 
     toolkit::_StrPrinter printer;
     printer << protocol << " " << res_code << "\r\n";
-    for (auto &pr : header){
+    for (auto &pr : header) {
         printer << pr.first << ": " << pr.second << "\r\n";
     }
 
     printer << "\r\n";
 
-    if(!sdp.empty()){
+    if (!sdp.empty()) {
         printer << sdp;
     }
-//	DebugP(this) << printer;
-    return send(std::make_shared<toolkit::BufferString>(std::move(printer))) > 0 ;
+    //	DebugP(this) << printer;
+    return send(std::make_shared<toolkit::BufferString>(std::move(printer))) > 0;
 }
 
-void RQRtspSession::send_StreamNotFound()
-{
-    sendRtspResponse("404 Stream Not Found",{"Connection","Close"});
+void RQRtspSession::send_StreamNotFound() {
+    sendRtspResponse("404 Stream Not Found", { "Connection", "Close" });
 }
 
-void RQRtspSession::send_SessionNotFound()
-{
-    sendRtspResponse("454 Session Not Found",{"Connection","Close"});
+void RQRtspSession::send_SessionNotFound() {
+    sendRtspResponse("454 Session Not Found", { "Connection", "Close" });
 }
 
+void RQRtspSession::send_NotAcceptable() {
+    sendRtspResponse("406 Not Acceptable", { "Connection", "Close" });
+}

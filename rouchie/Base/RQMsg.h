@@ -10,6 +10,7 @@ public:
     using Ptr = std::shared_ptr<RQMsg>;
 
 public:
+    explicit RQMsg(cmd_t cmd);
     RQMsg(mod_t sender, mod_t recver, cmd_t cmd);
     virtual ~RQMsg() = default;
 

@@ -49,6 +49,8 @@ set(Rouchie_SRC_LIST
 
 	Msg/RQFrameMsg.cpp
 	Msg/RQFrameMsg.h
+        Msg/RQTrackMsg.cpp
+        Msg/RQTrackMsg.h
 )
 
 add_library(${PROJECT_NAME} STATIC ${Rouchie_SRC_LIST})

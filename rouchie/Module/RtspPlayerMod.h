@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "Base/RQModuleBase.h"
+#include "Base/RQModuleHelper.h"
 #include "Player/MediaPlayer.h"
 #include <functional>
 #include <string>

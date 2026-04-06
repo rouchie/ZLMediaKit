@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "Base/RQModuleBase.h"
+#include "Base/RQModuleHelper.h"
 #include "Base/RQHttpHelper.h"
 
 class ApiHello : public RQModuleHelper<ApiHello> {

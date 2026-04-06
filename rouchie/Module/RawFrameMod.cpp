@@ -2,6 +2,9 @@
 
 #include "Base/RQCore.h"
 #include "Msg/RQFrameMsg.h"
+#include "Msg/RQTrackMsg.h"
+
+#include "Extension/Factory.h"
 
 RawFrameMod::RawFrameMod(std::string mp4File)
     : RQModuleHelper<RawFrameMod>(MOD_RAW_FRAME)
@@ -9,16 +12,26 @@ RawFrameMod::RawFrameMod(std::string mp4File)
 
 int RawFrameMod::OnStart() {
     Bind(CMD_HEARTBEAT, &RawFrameMod::OnHeartbeat);
-    Bind(CMD_SUBCP_FRAME, &RawFrameMod::OnSubscriptionFrame);
+    Bind(CMD_SUBSCRIPTION_STREAM, &RawFrameMod::OnSubscriptionStream);
 
     _demuxer = std::make_shared<MP4Demuxer>();
     _demuxer->openMP4(_mp4File);
 
     int interval = 10;
 
-    const auto track = std::dynamic_pointer_cast<VideoTrack>(_demuxer->getTrack(TrackVideo));
-    if (track) {
-        interval = static_cast<int>(1000 / track->getVideoFps());
+    const auto tracks = _demuxer->getTracks(false);
+    for (auto &track : tracks) {
+        const auto extra = track->getExtraData();
+
+        if (track->getTrackType() == TrackVideo) {
+            const auto vTrack = std::dynamic_pointer_cast<VideoTrack>(track);
+            interval = static_cast<int>(1000 / vTrack->getVideoFps());
+            _videoTrack = std::dynamic_pointer_cast<VideoTrack>(track->clone());
+        } else if (track->getTrackType() == TrackAudio) {
+            // _audioTrack = std::dynamic_pointer_cast<AudioTrack>(Factory::getTrackByAbstractTrack(track));
+            // _audioTrack->setExtraData(reinterpret_cast<const uint8_t *>(extra->data()), extra->size());
+            _audioTrack = std::dynamic_pointer_cast<AudioTrack>(track->clone());
+        }
     }
 
     _timerHeartbeat = Timer(interval, RQMsg::Build(ID(), CMD_HEARTBEAT));
@@ -42,7 +55,7 @@ int RawFrameMod::OnHeartbeat(const RQMsg::Ptr &msg) {
         }
 
         for (auto &recver : _mod_list) {
-            const auto frameMsg = std::make_shared<RQFrameMsg>(ID(), recver, CMD_FRAME_DATA);
+            const auto frameMsg = std::make_shared<RQFrameMsg>(ID(), recver, CMD_STREAM_FRAME_DATA);
             const auto buffer = toolkit::BufferRaw::create();
             buffer->assign(frame->data(), frame->size());
 
@@ -61,8 +74,17 @@ int RawFrameMod::OnHeartbeat(const RQMsg::Ptr &msg) {
     return 0;
 }
 
-int RawFrameMod::OnSubscriptionFrame(const RQMsg::Ptr &msg) {
+int RawFrameMod::OnSubscriptionStream(const RQMsg::Ptr &msg) {
+    // 发送轨道信息
+    const auto trackMsg = std::make_shared<RQTrackMsg>(CMD_STREAM_TRACK_INFO);
+    trackMsg->videoTrack = _videoTrack;
+    trackMsg->audioTrack = _audioTrack;
+
+    SendMessage(msg->_sender, trackMsg);
+
+    // 添加订阅者
     _mod_list.push_back(msg->_sender);
+
     return 0;
 }
 

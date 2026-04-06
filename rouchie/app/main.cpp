@@ -5,10 +5,14 @@
 #include "Rtmp/RtmpSession.h"
 
 #include "Base/RQHttpServer.h"
+
 #include "Module/HttpMod.h"
 #include "Module/MP4ReaderMod.h"
+#include "Module/RawFrameMod.h"
 #include "Module/RtmpMediaSourceMod.h"
 #include "Module/RtspMediaSourceMod.h"
+#include "Module/TrackMod.h"
+
 #include "Util/onceToken.h"
 #include "server/RQRtspSession.h"
 #include "server/RQRtmpSession.h"
@@ -26,8 +30,10 @@ int main(int argc, char *argv[])
     Logger::Instance().setWriter(std::make_shared<AsyncLogWriter>());
 
     auto mp4ReadMod = CreateModule<MP4ReaderMod>("test.mp4", "live", "stream");
+    auto rawFrame = CreateModule<RawFrameMod>("test.mp4");
     auto rtmpSourceMod = CreateModule<RtmpMediaSourceMod>("test.mp4", "live", "rtmp");
     auto rtspSourceMod = CreateModule<RtspMediaSourceMod>("test.mp4", "live", "rtsp");
+    auto trackMod = CreateModule<TrackMod>();
 
     const auto rtspSrv = std::make_shared<TcpServer>();
     rtspSrv->start<mediakit::RtspSession>(554, "::");

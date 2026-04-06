@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "Base/RQModuleBase.h"
+#include "Base/RQModuleHelper.h"
 #include "Record/MP4Demuxer.h"
 
 using namespace toolkit;
@@ -14,7 +14,7 @@ public:
 
 private:
     int OnHeartbeat(const RQMsg::Ptr &msg);
-    int OnSubscriptionFrame(const RQMsg::Ptr &msg);
+    int OnSubscriptionStream(const RQMsg::Ptr &msg);
 
 private:
     uint32_t getCurrentStamp() const;
@@ -30,4 +30,7 @@ private:
     toolkit::Ticker _seek_ticker;
 
     std::list<mod_t> _mod_list;
+
+    mediakit::VideoTrack::Ptr _videoTrack;
+    mediakit::AudioTrack::Ptr _audioTrack;
 };
