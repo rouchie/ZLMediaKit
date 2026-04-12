@@ -118,9 +118,9 @@ void RQRtspSession::handleReq_Setup(const mediakit::Parser &parser) {
         }
     };
 
-    InfoL << fmt::format("fullUrl[{}] controlUrl[{}]", parser.fullUrl(), _sdp_track[0]->getControlUrl(_content_base));
-
     const int trackIdx = getTrackIndexByControlUrl(parser.fullUrl());
+
+    InfoL << fmt::format("fullUrl[{}] controlUrl[{}]", parser.fullUrl(), _sdp_track[trackIdx]->getControlUrl(_content_base));
 
     const SdpTrack::Ptr &trackRef = _sdp_track[trackIdx];
     if (trackRef->_inited) {
@@ -488,7 +488,7 @@ void RQRtspSession::onAuthFailed(const std::string &realm, const std::string &wh
     }
 }
 
-int RQRtspSession::getTrackIndexByControlUrl(const std::string &control_url) {
+int RQRtspSession::getTrackIndexByControlUrl(const std::string &control_url) const {
     for (size_t i = 0; i < _sdp_track.size(); ++i) {
         if (control_url.find(_sdp_track[i]->getControlUrl(_content_base)) == 0) {
             return i;
@@ -500,7 +500,7 @@ int RQRtspSession::getTrackIndexByControlUrl(const std::string &control_url) {
     throw toolkit::SockException(toolkit::Err_shutdown, StrPrinter << "no such track with control url:" << control_url);
 }
 
-int RQRtspSession::getTrackIndexByTrackType(mediakit::TrackType type) {
+int RQRtspSession::getTrackIndexByTrackType(const mediakit::TrackType type) const {
     for (size_t i = 0; i < _sdp_track.size(); ++i) {
         if (type == _sdp_track[i]->_type) {
             return i;

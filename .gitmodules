@@ -13,3 +13,6 @@
 [submodule "3rdpart/pybind11"]
 	path = 3rdpart/pybind11
 	url = https://gitee.com/mirrors/pybind11.git
+[submodule "rouchie/imgui"]
+	path = rouchie/imgui
+	url = https://github.com/ocornut/imgui.git

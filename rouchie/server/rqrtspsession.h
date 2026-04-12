@@ -53,8 +53,8 @@ private:
     void onAuthFailed(const std::string &realm, const std::string &why, bool close = true);
     void onAuthSuccess();
 
-    int getTrackIndexByControlUrl(const std::string &control_url);
-    int getTrackIndexByTrackType(mediakit::TrackType type);
+    int getTrackIndexByControlUrl(const std::string &control_url) const;
+    int getTrackIndexByTrackType(const mediakit::TrackType type) const;
 
 private:
     uint64_t _bytes_usage = 0;
