@@ -19,6 +19,8 @@ set(IMGUI_SRC_LIST
 	imgui/backends/imgui_impl_opengl3.cpp
 	imgui/backends/imgui_impl_opengl3.h
 	imgui/backends/imgui_impl_opengl3_loader.h
+	imgui/misc/cpp/imgui_stdlib.cpp
+	imgui/misc/cpp/imgui_stdlib.h
 )
 
 add_library(${LIB_IMGUI} STATIC ${IMGUI_SRC_LIST})
@@ -32,5 +34,6 @@ target_include_directories(${LIB_IMGUI} PUBLIC
 	${CMAKE_SYSTEM_INCLUDE_PATH}
 	${PROJECT_SOURCE_DIR}/imgui
 	${PROJECT_SOURCE_DIR}/imgui/backends
+	${PROJECT_SOURCE_DIR}/imgui/misc/cpp
 )
 target_link_libraries(${LIB_IMGUI} PUBLIC glfw opengl32)

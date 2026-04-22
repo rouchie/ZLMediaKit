@@ -39,7 +39,7 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
-inline int RunImgui(bool& run, std::initializer_list<std::function<void()>> callbacks)
+inline int RunImgui(bool& run, const std::initializer_list<std::function<void()>> callbacks)
 {
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -94,8 +94,9 @@ inline int RunImgui(bool& run, std::initializer_list<std::function<void()>> call
     //io.ConfigViewportsNoTaskBarIcon = true;
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
+    // ImGui::StyleColorsDark();
+    // ImGui::StyleColorsLight();
+    ImGui::StyleColorsClassic();
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();
