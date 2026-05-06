@@ -1,18 +1,14 @@
 ﻿#pragma once
 
-#include "../imguidemo/runimgui.h"
-#include "imgui_stdlib.h"
+#include "guibase.h"
 
 #include "Module/MP4ReaderMod.h"
 #include "Base/RQCoreCreateModule.h"
 
-#include <fmt/format.h>
-#include <string>
-
-class GuiMediaSource {
+class GuiMediaSource : public GuiBase {
 public:
     GuiMediaSource() = default;
-    void operator()();
+    void operator()() override;
 
 private:
     void StatusChange();

@@ -94,9 +94,9 @@ inline int RunImgui(bool& run, const std::initializer_list<std::function<void()>
     //io.ConfigViewportsNoTaskBarIcon = true;
 
     // Setup Dear ImGui style
-    // ImGui::StyleColorsDark();
+    ImGui::StyleColorsDark();
     // ImGui::StyleColorsLight();
-    ImGui::StyleColorsClassic();
+    // ImGui::StyleColorsClassic();
 
     // Setup scaling
     ImGuiStyle& style = ImGui::GetStyle();

@@ -1,13 +1,8 @@
 ﻿#pragma once
 
-#include "runimgui.h"
-#include "topwindow.h"
-#include "imgui_stdlib.h"
+#include "guibase.h"
 
-#include <fmt/format.h>
-#include <string>
-
-class GuiTest {
+class GuiTest : public GuiBase {
 public:
     GuiTest() = default;
     void operator()();

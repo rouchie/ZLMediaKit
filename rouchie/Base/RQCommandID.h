@@ -6,9 +6,10 @@
 using cmd_t = int64_t;
 
 #define CMD_LIST                                                            \
-    X(CMD_START,                                                  1)        \
-    X(CMD_STOP,                                                   2)        \
-    X(CMD_HEARTBEAT,                                              3)        \
+    X(CMD_START,                                                  10)       \
+    X(CMD_STOP,                                                   20)       \
+    X(CMD_TRIGGER,                                                25)       \
+    X(CMD_HEARTBEAT,                                              30)       \
     X(CMD_SUBSCRIPTION_STREAM,                                    1000)     \
     X(CMD_STREAM_TRACK_INFO,                                      1010)     \
     X(CMD_STREAM_FRAME_DATA,                                      1100)     \

@@ -1,23 +1,8 @@
-﻿#include "guimediasource.h"
-#include "guitest.h"
+﻿#include "runimgui.h"
+#include "guimain.h"
 
-int main(int, char**)
-{
+int main(int, char **) {
     bool run = true;
-
-    auto f = [&run]() {
-        ImGui::Begin("Stop Window", nullptr, ImGuiWindowFlags_NoTitleBar);
-        if (ImGui::Button("退出", ImVec2(200, 100))) {
-            run = false;
-        }
-        ImGui::End();
-    };
-
-    const std::initializer_list<std::function<void()>> guiList = {
-        f,
-        GuiTest(),
-        GuiMediaSource(),
-    };
-
+    const std::initializer_list<std::function<void()>> guiList = { GuiMain(run) };
     return RunImgui(run, guiList);
 }
