@@ -8,10 +8,11 @@
 
 #include "design_patterns/guifactory.h"
 #include "design_patterns/guiabstractfactory.h"
+#include "design_patterns/guisingleton.h"
 
 class GuiMain : public GuiBase {
 public:
-    GuiMain(bool& run);
+    explicit GuiMain(bool& run);
 
     void operator()() override;
 
@@ -31,16 +32,19 @@ private:
 
     bool _bShowAbstractFactory = false; // 抽象工厂方法
     Ptr _guiAbstractFactory;
+
+    bool _bShowSingleton = false; // 单例
+    Ptr _guiSingleton;
 };
 
 inline GuiMain::GuiMain(bool &run) : _bRun(run) { }
 
-#define CHECKBOX(NAME, VALUE)                                                                                                                    \
-    ImGui::Checkbox(NAME, &_bShow##VALUE);                                                                                                                             \
-    if (_bShow##VALUE) {                                                                                                                                               \
-        if (!_gui##VALUE)                                                                                                                                              \
-            _gui##VALUE = std::make_shared<Gui##VALUE>();                                                                                                                 \
-        (*_gui##VALUE)();                                                                                                                                              \
+#define CHECKBOX(NAME, VALUE)                                                                                                                                  \
+    ImGui::Checkbox(NAME, &_bShow##VALUE);                                                                                                                     \
+    if (_bShow##VALUE) {                                                                                                                                       \
+        if (!_gui##VALUE)                                                                                                                                      \
+            _gui##VALUE = std::make_shared<Gui##VALUE>();                                                                                                      \
+        (*_gui##VALUE)();                                                                                                                                      \
     }
 
 inline void GuiMain::operator()() {
@@ -60,7 +64,8 @@ inline void GuiMain::operator()() {
         ImGui::Text("创建型模式");
 
         CHECKBOX(u8"工厂方法", Factory);
-        CHECKBOX(u8"抽象工厂方法", AbstractFactory);
+        CHECKBOX(u8"抽象工厂", AbstractFactory);
+        CHECKBOX(u8"单例", Singleton);
 
         ImGui::Separator();
         ImGui::Text("结构型模式");
