@@ -9,6 +9,7 @@
 #include "design_patterns/guifactory.h"
 #include "design_patterns/guiabstractfactory.h"
 #include "design_patterns/guisingleton.h"
+#include "design_patterns/guiadapter.h"
 
 class GuiMain : public GuiBase {
 public:
@@ -35,6 +36,9 @@ private:
 
     bool _bShowSingleton = false; // 单例
     Ptr _guiSingleton;
+
+    bool _bShowAdapter = false; // 适配器
+    Ptr _guiAdapter;
 };
 
 inline GuiMain::GuiMain(bool &run) : _bRun(run) { }
@@ -69,6 +73,9 @@ inline void GuiMain::operator()() {
 
         ImGui::Separator();
         ImGui::Text("结构型模式");
+
+        CHECKBOX(u8"适配器", Adapter);
+
         ImGui::Separator();
         ImGui::Text("行为型模式");
         ImGui::Separator();
