@@ -10,6 +10,7 @@
 #include "design_patterns/guiabstractfactory.h"
 #include "design_patterns/guisingleton.h"
 #include "design_patterns/guiadapter.h"
+#include "design_patterns/guibridge.h"
 
 class GuiMain : public GuiBase {
 public:
@@ -39,6 +40,9 @@ private:
 
     bool _bShowAdapter = false; // 适配器
     Ptr _guiAdapter;
+
+    bool _bShowBridge = false; // 桥接
+    Ptr _guiBridge;
 };
 
 inline GuiMain::GuiMain(bool &run) : _bRun(run) { }
@@ -75,6 +79,7 @@ inline void GuiMain::operator()() {
         ImGui::Text("结构型模式");
 
         CHECKBOX(u8"适配器", Adapter);
+        CHECKBOX(u8"桥接", Bridge);
 
         ImGui::Separator();
         ImGui::Text("行为型模式");
