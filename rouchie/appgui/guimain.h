@@ -11,6 +11,7 @@
 #include "design_patterns/guisingleton.h"
 #include "design_patterns/guiadapter.h"
 #include "design_patterns/guibridge.h"
+#include "design_patterns/guicomposite.h"
 
 class GuiMain : public GuiBase {
 public:
@@ -43,6 +44,9 @@ private:
 
     bool _bShowBridge = false; // 桥接
     Ptr _guiBridge;
+
+    bool _bShowComposite = false; // 组合
+    Ptr _guiComposite;
 };
 
 inline GuiMain::GuiMain(bool &run) : _bRun(run) { }
@@ -80,6 +84,7 @@ inline void GuiMain::operator()() {
 
         CHECKBOX(u8"适配器", Adapter);
         CHECKBOX(u8"桥接", Bridge);
+        CHECKBOX(u8"组合", Composite);
 
         ImGui::Separator();
         ImGui::Text("行为型模式");
