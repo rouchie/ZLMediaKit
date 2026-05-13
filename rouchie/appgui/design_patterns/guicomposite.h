@@ -92,13 +92,13 @@ inline void GuiComposite::operator()() {
     static std::string newNodeName;
     ImGui::InputText(u8"输入目录/文件名称", &newNodeName);
 
-    if (ImGui::Button(u8"添加目录")) {
+    if (ImGui::Button(u8"添加目录") && !newNodeName.empty()) {
         _current->add(std::make_shared<Folder>(newNodeName, _current));
     }
 
     ImGui::SameLine();
 
-    if (ImGui::Button(u8"添加文件")) {
+    if (ImGui::Button(u8"添加文件") && !newNodeName.empty()) {
         _current->add(std::make_shared<File>(newNodeName, 1024, _current));
     }
 
@@ -123,7 +123,7 @@ inline void GuiComposite::operator()() {
         auto name = item->name();
         static std::string selected_item;
         const auto flag = item->hasSubNode() ? ImGuiSelectableFlags_None : ImGuiSelectableFlags_Disabled;
-        if (ImGui::Selectable(name.c_str(), selected_item == name,  flag)) {
+        if (ImGui::Selectable(name.c_str(), selected_item == name, flag)) {
             selected_item = name;
             _current = item;
         }
